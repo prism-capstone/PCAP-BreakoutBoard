@@ -36,10 +36,11 @@ typedef enum {
     PCAP_CHIP_1 = 0,        ///< PCAP chip 1 (mux channel 0)
     PCAP_CHIP_2 = 1,        ///< PCAP chip 2 (mux channel 1)
     PCAP_CHIP_3 = 2,        ///< PCAP chip 3 (mux channel 2)
-    PCAP_CHIP_5 = 3,        ///< PCAP chip 5 (mux channel 3)
-    PCAP_CHIP_6 = 4,        ///< PCAP chip 6 (mux channel 4)
-    PCAP_CHIP_7 = 5,        ///< PCAP chip 7 (mux channel 5)
-    PCAP_CHIP_8 = 6,        ///< PCAP chip 8 (mux channel 6)
+    PCAP_CHIP_4 = 3,        ///< PCAP chip 4 (mux channel 3)
+    PCAP_CHIP_5 = 4,        ///< PCAP chip 5 (mux channel 4)
+    PCAP_CHIP_6 = 5,        ///< PCAP chip 6 (mux channel 5)
+    PCAP_CHIP_7 = 6,        ///< PCAP chip 7 (mux channel 6)
+    PCAP_CHIP_8 = 7,        ///< PCAP chip 8 (mux channel 7)
     PCAP_CHIP_NONE = 15     ///< No chip selected / invalid selection
 } pcap_chip_select_t;
 
@@ -58,8 +59,6 @@ public:
      * Configures the GPIO pins as outputs and deselects all chips initially.
      */
     void begin();
-
-    void deselectChip();
 
     /**
      * @brief Select a specific PCAP chip through the multiplexer

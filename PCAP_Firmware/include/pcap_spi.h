@@ -64,17 +64,17 @@ public:
      * Transmits a command without additional data or address bytes.
      * Used for operations like POR, INIT, CDC_START, etc.
      */
-    void sendCommand(uint8_t cmd);
+    uint8_t sendCommand(uint8_t cmd);
+    uint16_t sendCommand16(uint16_t cmd);
+    uint32_t sendCommand32(uint32_t cmd);
 
     /**
      * @brief Write a single byte to a PCAP chip register
-     * @param cmd Write command byte
-     * @param addr Register address to write to
      * @param data Data byte to write
      *
      * Performs a single-byte write transaction to the specified register address.
      */
-    void writeByte(uint8_t cmd, uint8_t addr, uint8_t data);
+    void writeByte(uint8_t data);
 
     /**
      * @brief Write multiple bytes to consecutive PCAP chip registers
@@ -86,17 +86,15 @@ public:
      * Writes a block of data starting at the specified address with auto-increment.
      * Used for configuration and firmware uploads.
      */
-    void writeBytes(uint8_t cmd, uint8_t addr, uint8_t* data, uint16_t len);
+    void writeBytes(uint8_t* data, uint16_t len);
 
     /**
      * @brief Read a single byte from a PCAP chip register
-     * @param cmd Read command byte
-     * @param addr Register address to read from
-     * @return The byte read from the specified address
+     * @return The byte read
      *
      * Performs a single-byte read transaction from the specified register address.
      */
-    uint8_t readByte(uint8_t cmd, uint8_t addr);
+    uint8_t readByte();
 
     /**
      * @brief Read multiple bytes from consecutive PCAP chip registers
@@ -108,7 +106,7 @@ public:
      * Reads a block of data starting at the specified address with auto-increment.
      * Used for reading configuration and measurement results.
      */
-    void readBytes(uint8_t cmd, uint8_t addr, uint8_t* buffer, uint16_t len);
+    void readBytes(uint8_t* buffer, uint16_t len);
 
     /**
      * @brief Read a 24-bit measurement result from a specific sensor
@@ -120,8 +118,11 @@ public:
      */
     uint32_t readResult(uint8_t sensor_num);
 
+    void setDummyByte(uint8_t num);
+
 private:
     SPISettings spi_settings; ///< SPI bus configuration settings
+    uint8_t dummy_byte;
 };
 
 #endif // PCAP_SPI_H

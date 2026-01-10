@@ -106,38 +106,20 @@ void setup() {
     // Test communication with each chip
     Serial.println("\n--- Testing Communication ---");
 
-    for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_3; pcap_num++)
+    for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
     {
-        if(!pcap.testCommunication((pcap_chip_select_t) pcap_num))
-        {
-            return;
-        }
+        pcap.testCommunication((pcap_chip_select_t) pcap_num);
     }
     
     // Initialize chips
     Serial.println("\n--- Initializing Chips ---");
-    for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_3; pcap_num++)
+    for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
     {
-        if(!pcap.initChip((pcap_chip_select_t) pcap_num))
-        {
-            return;
-        }
+        pcap.initChip((pcap_chip_select_t) pcap_num);
+        pcap.writeFirmware((pcap_chip_select_t) pcap_num, standard_firmware, PCAP_FW_SIZE);
+        pcap.writeConfig((pcap_chip_select_t) pcap_num, standard_config, PCAP_CONFIG_SIZE);
+        pcap.startCDC((pcap_chip_select_t) (pcap_num));
     }
-
-    // Upload firmware to chips
-    Serial.println("\n--- Uploading Firmware ---");
-    pcap.writeFirmware(PCAP_CHIP_1, standard_firmware, PCAP_FW_SIZE);
-    pcap.writeFirmware(PCAP_CHIP_2, standard_firmware, PCAP_FW_SIZE);
-    pcap.writeFirmware(PCAP_CHIP_3, standard_firmware, PCAP_FW_SIZE);
-
-    // Write configuration to chips
-    Serial.println("\n--- Writing Configuration ---");
-    pcap.writeConfig(PCAP_CHIP_1, standard_config, PCAP_CONFIG_SIZE);
-    pcap.writeConfig(PCAP_CHIP_2, standard_config, PCAP_CONFIG_SIZE);
-    pcap.writeConfig(PCAP_CHIP_3, standard_config, PCAP_CONFIG_SIZE);
-    
-    Serial.println("\n--- Setup Complete ---");
-    Serial.println("Starting continuous measurement...\n");
 }
 
 void loop() {
@@ -148,18 +130,11 @@ void loop() {
     if (current_time - last_measurement >= 10) {
         last_measurement = current_time;
         
-        // Start CDC measurement on all chips
-        pcap.startCDC(PCAP_CHIP_1);
-        pcap.startCDC(PCAP_CHIP_2);
-        pcap.startCDC(PCAP_CHIP_3);
-        
-        // Wait for conversion (5ms - adjust if needed based on your config)
-        delay(5);
-        
         // Read results from each chip
-        pcap.readResults(PCAP_CHIP_1, &chip_data[0]);
-        pcap.readResults(PCAP_CHIP_2, &chip_data[1]);
-        pcap.readResults(PCAP_CHIP_3, &chip_data[2]);
+        for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
+        {
+            pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
+        }
         
         // Print results
         printResults();
@@ -182,7 +157,7 @@ void printResults() {
     Serial.println("-----|----------|----------|----------|----------|----------|----------");
     
     // Print data for each chip
-    for (int chip = 0; chip < 3; chip++) {
+    for (int chip = PCAP_CHIP_1; chip <= PCAP_CHIP_8; chip++) {
         Serial.print("  ");
         Serial.print(chip + 1);
         Serial.print("  | ");

@@ -105,7 +105,7 @@ public:
      * Reads the measurement results for all six sensors on the specified chip
      * and stores them in the provided data structure.
      */
-    void readResults(pcap_chip_select_t chip, pcap_data_t* data);
+    void readPCAP(pcap_chip_select_t chip, pcap_data_t* data);
 
     /**
      * @brief Read measurement result from a single sensor

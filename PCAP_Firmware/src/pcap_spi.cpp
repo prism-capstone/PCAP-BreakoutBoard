@@ -3,6 +3,29 @@
  * @brief SPI communication implementation for PCAP04 chips
  */
 
+/*
+ * IMPORTANT NOTE ON SPI COMMUNICATION:
+ * ====================================
+ * SPI is a full-duplex protocol - you CANNOT receive without transmitting.
+ * Every SPI.transfer() call simultaneously sends AND receives one byte.
+ * 
+ * During read operations, when we want to receive data from the device,
+ * we must still send something on MOSI. This is typically called a "dummy byte".
+ * 
+ * By default, this driver sends 0x00 as the dummy byte during reads.
+ * However, some devices may interpret certain byte values as commands even
+ * during what we consider "read-only" operations.
+ * 
+ * If you find that 0x00 interferes with your device:
+ * 1. Check the device datasheet for a "safe" dummy byte value
+ * 2. Common alternatives: 0xFF, 0xAA, 0x55
+ * 3. Use setDummyByte() to configure it:
+ *    sensor.setDummyByte(0xFF);
+ * 
+ * Some devices explicitly ignore MOSI during reads, in which case the
+ * dummy byte value doesn't matter.
+ */
+
 #include "pcap_spi.h"
 
 void PCAP_SPI::begin() {
@@ -11,27 +34,61 @@ void PCAP_SPI::begin() {
 
     SPI.begin();
     spi_settings = SPISettings(PCAP_SPI_CLOCK, PCAP_SPI_BIT_ORDER, PCAP_SPI_MODE);
+    setDummyByte(0x00);
 }
 
-void PCAP_SPI::sendCommand(uint8_t cmd) {
+uint8_t PCAP_SPI::sendCommand(uint8_t cmd) {
     // CS is controlled by multiplexer - chip select via PCAP_SEL pins before calling
+    uint8_t result; 
     SPI.beginTransaction(spi_settings);
     delayMicroseconds(1);
 
-    SPI.transfer(cmd);
+    result = SPI.transfer(cmd);
 
     delayMicroseconds(1);
     SPI.endTransaction();
 
     delayMicroseconds(10);  // Allow PCAP to process
+
+    return result;
 }
 
-void PCAP_SPI::writeByte(uint8_t cmd, uint8_t addr, uint8_t data) {
+uint16_t PCAP_SPI::sendCommand16(uint16_t cmd) {
+    // CS is controlled by multiplexer - chip select via PCAP_SEL pins before calling
+    uint16_t result; 
     SPI.beginTransaction(spi_settings);
     delayMicroseconds(1);
 
-    SPI.transfer(cmd);
-    SPI.transfer(addr);
+    result = SPI.transfer16(cmd);
+
+    delayMicroseconds(1);
+    SPI.endTransaction();
+
+    delayMicroseconds(10);  // Allow PCAP to process
+
+    return result;
+}
+
+uint32_t PCAP_SPI::sendCommand32(uint32_t cmd) {
+    // CS is controlled by multiplexer - chip select via PCAP_SEL pins before calling
+    uint32_t result; 
+    SPI.beginTransaction(spi_settings);
+    delayMicroseconds(1);
+
+    result = SPI.transfer32(cmd);
+
+    delayMicroseconds(1);
+    SPI.endTransaction();
+
+    delayMicroseconds(10);  // Allow PCAP to process
+
+    return result;
+}
+
+void PCAP_SPI::writeByte(uint8_t data) {
+    SPI.beginTransaction(spi_settings);
+    delayMicroseconds(1);
+
     SPI.transfer(data);
 
     delayMicroseconds(1);
@@ -40,16 +97,11 @@ void PCAP_SPI::writeByte(uint8_t cmd, uint8_t addr, uint8_t data) {
     delayMicroseconds(10);
 }
 
-void PCAP_SPI::writeBytes(uint8_t cmd, uint8_t addr, uint8_t* data, uint16_t len) {
+void PCAP_SPI::writeBytes(uint8_t* data, uint16_t len) {
     SPI.beginTransaction(spi_settings);
     delayMicroseconds(1);
 
-    SPI.transfer(cmd);
-    SPI.transfer(addr);
-
-    for (uint16_t i = 0; i < len; i++) {
-        SPI.transfer(data[i]);
-    }
+    SPI.transferBytes(data, NULL, len);
 
     delayMicroseconds(1);
     SPI.endTransaction();
@@ -57,15 +109,13 @@ void PCAP_SPI::writeBytes(uint8_t cmd, uint8_t addr, uint8_t* data, uint16_t len
     delayMicroseconds(10);
 }
 
-uint8_t PCAP_SPI::readByte(uint8_t cmd, uint8_t addr) {
+uint8_t PCAP_SPI::readByte() {
     uint8_t result;
 
     SPI.beginTransaction(spi_settings);
     delayMicroseconds(1);
 
-    SPI.transfer(cmd);
-    SPI.transfer(addr);
-    result = SPI.transfer(0x00);  // Dummy byte to read
+    result = SPI.transfer(dummy_byte); // Dummy byte to read
 
     delayMicroseconds(1);
     SPI.endTransaction();
@@ -74,16 +124,11 @@ uint8_t PCAP_SPI::readByte(uint8_t cmd, uint8_t addr) {
     return result;
 }
 
-void PCAP_SPI::readBytes(uint8_t cmd, uint8_t addr, uint8_t* buffer, uint16_t len) {
+void PCAP_SPI::readBytes(uint8_t* buffer, uint16_t len) {
     SPI.beginTransaction(spi_settings);
     delayMicroseconds(1);
 
-    SPI.transfer(cmd);
-    SPI.transfer(addr);
-
-    for (uint16_t i = 0; i < len; i++) {
-        buffer[i] = SPI.transfer(0x00);
-    }
+    SPI.transferBytes(NULL, buffer, len);
 
     delayMicroseconds(1);
     SPI.endTransaction();
@@ -91,19 +136,25 @@ void PCAP_SPI::readBytes(uint8_t cmd, uint8_t addr, uint8_t* buffer, uint16_t le
     delayMicroseconds(10);
 }
 
-uint32_t PCAP_SPI::readResult(uint8_t sensor_num) {
+uint32_t PCAP_SPI::readResult(uint8_t sensor_addr) {
     uint32_t result = 0;
-    uint8_t buffer[3];
+    uint8_t buffer[4] = {0};
 
-    // Each result is 3 bytes, starting at address sensor_num * 3
-    uint8_t addr = sensor_num * 3;
+    SPI.beginTransaction(spi_settings);
 
-    readBytes(PCAP_RD_RESULT, addr, buffer, 3);
+    // Send request to read sensor data
+    SPI.transfer(PCAP_RD_RESULT | sensor_addr);
 
-    // Combine bytes into 24-bit value (MSB first)
-    result = ((uint32_t)buffer[0] << 16) |
-             ((uint32_t)buffer[1] << 8) |
-             buffer[2];
+    // Receive 4 bytes back
+    SPI.transferBytes(NULL, buffer, 4);
+
+    SPI.endTransaction();
+
+    result = ((buffer[3] << 24) + (buffer[2] << 16) + (buffer[1] << 8) + (buffer[0]));
 
     return result;
+}
+
+void PCAP_SPI::setDummyByte(uint8_t num) {
+    dummy_byte = num;
 }

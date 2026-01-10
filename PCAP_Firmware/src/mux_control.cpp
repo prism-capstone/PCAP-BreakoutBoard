@@ -10,10 +10,6 @@ void MuxControl::begin() {
     selectChip(PCAP_CHIP_NONE);
 }
 
-void MuxControl::deselectChip() {
-    selectChip(PCAP_CHIP_NONE);
-}
-
 void MuxControl::selectChip(pcap_chip_select_t chip) {
     if (chip == PCAP_CHIP_NONE) {
         return;

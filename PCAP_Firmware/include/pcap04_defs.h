@@ -20,8 +20,8 @@
 
 /** @defgroup MemoryCommands Memory Access Commands */
 /** @{ */
-#define PCAP_WR_MEM         0xA0    ///< Write to internal memory
-#define PCAP_RD_MEM         0x20    ///< Read from internal memory
+#define PCAP_WR_MEM         0xA000    ///< Write to internal memory
+#define PCAP_RD_MEM         0x20      ///< Read from internal memory
 /** @} */
 
 /** @defgroup ConfigCommands Configuration Access Commands */
