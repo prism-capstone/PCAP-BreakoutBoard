@@ -11,9 +11,36 @@
 #ifndef PCAP_DRIVER_H
 #define PCAP_DRIVER_H
 
+#include <Arduino.h>
+#include <SPI.h>
 #include "pcap04_defs.h"
-#include "pcap_spi.h"
 #include "mux_control.h"
+
+/**
+ * @defgroup SPIConfig SPI Configuration
+ * @brief SPI bus settings for PCAP04 communication
+ * @{
+ */
+#define PCAP_SPI_CLOCK      4000000  ///< SPI clock frequency: 4 MHz
+#define PCAP_SPI_MODE       SPI_MODE1 ///< SPI mode 1 (CPOL=0, CPHA=1)
+#define PCAP_SPI_BIT_ORDER  MSBFIRST  ///< Most significant bit first
+/** @} */
+
+/**
+ * @note Hardware SPI Configuration:
+ * This design uses a CD74HC4067 multiplexer with inverted CS logic:
+ * - COMMON_I/O is tied to GND
+ * - All CS outputs (CS1-CS8) have pull-up resistors (default HIGH/inactive)
+ * - When a chip is selected via PCAP_SEL pins, that chip's CS goes LOW (active)
+ * - No GPIO needed for CS control - the multiplexer handles it automatically
+ *
+ * SPI Bus Connections:
+ * - MOSI: GPIO 10 (PA6_A10_D10_MOSI)
+ * - MISO: GPIO 9  (PA5_A9_D9_MISO)
+ * - SCK:  GPIO 8  (PA7_A8_D8_SCK)
+ *
+ * The multiplexer select pins (PCAP_SEL0-3) control which PCAP chip's CS is active.
+ */
 
 /**
  * @class PCAP_Driver
@@ -33,6 +60,10 @@ public:
      * Must be called before any other driver functions.
      */
     void begin();
+
+    uint8_t spi_transmit(pcap_chip_select_t chip, uint32_t data);
+    uint8_t spi_transmit(pcap_chip_select_t chip, uint16_t data);
+    uint8_t spi_transmit(pcap_chip_select_t chip, uint8_t data);
 
     /**
      * @brief Initialize a specific PCAP chip
@@ -139,7 +170,7 @@ public:
     bool testCommunication(pcap_chip_select_t chip);
 
 private:
-    PCAP_SPI spi;       ///< SPI communication interface
+    SPISettings spi_settings; ///< SPI bus configuration settings
     MuxControl mux;     ///< Multiplexer control for chip selection
 };
 

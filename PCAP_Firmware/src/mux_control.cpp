@@ -11,10 +11,6 @@ void MuxControl::begin() {
 }
 
 void MuxControl::selectChip(pcap_chip_select_t chip) {
-    if (chip == PCAP_CHIP_NONE) {
-        return;
-    }
-
     // Set the channel select pins according to the chip select pins
     digitalWrite(MUX_S0_PIN, (chip & 0x01) ? HIGH : LOW);
     digitalWrite(MUX_S1_PIN, (chip & 0x02) ? HIGH : LOW);

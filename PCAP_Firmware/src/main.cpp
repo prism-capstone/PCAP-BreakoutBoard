@@ -118,27 +118,27 @@ void setup() {
         pcap.initChip((pcap_chip_select_t) pcap_num);
         pcap.writeFirmware((pcap_chip_select_t) pcap_num, standard_firmware, PCAP_FW_SIZE);
         pcap.writeConfig((pcap_chip_select_t) pcap_num, standard_config, PCAP_CONFIG_SIZE);
-        pcap.startCDC((pcap_chip_select_t) (pcap_num));
+        pcap.startCDC((pcap_chip_select_t) pcap_num);
     }
 }
 
 void loop() {
-    static unsigned long last_measurement = 0;
-    unsigned long current_time = millis();
+    // static unsigned long last_measurement = 0;
+    // unsigned long current_time = millis();
     
-    // Take measurement every 10ms (100Hz)
-    if (current_time - last_measurement >= 10) {
-        last_measurement = current_time;
+    // // Take measurement every 10ms (100Hz)
+    // if (current_time - last_measurement >= 10) {
+    //     last_measurement = current_time;
         
-        // Read results from each chip
-        for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
-        {
-            pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
-        }
+    //     // Read results from each chip
+    //     for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
+    //     {
+    //         pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
+    //     }
         
-        // Print results
-        printResults();
-    }
+    //     // Print results
+    //     printResults();
+    // }
 }
 
 void printResults() {
