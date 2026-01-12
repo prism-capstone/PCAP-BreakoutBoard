@@ -14,16 +14,16 @@
 /**
  * @defgroup MuxPins Multiplexer Control Pins
  * @brief GPIO pins connected to CD74HC4067 multiplexer select lines
- * Based on Seeeduino XIAO ESP32C3 pinout and your schematic
+ * Based on Seeeduino XIAO ESP32C3 pinout and the schematic
  * The multiplexer routes the shared CS signal to individual PCAP chips
  * @{
  */
 
 // TODO: These pin assignments are based on the old schematic. Need to change for the new board.
-#define MUX_S0_PIN  D3   ///< PCAP_SEL0 - Connects to multiplexer S0 (pin 3)
-#define MUX_S1_PIN  D2   ///< PCAP_SEL1 - Connects to multiplexer S1 (pin 2)
-#define MUX_S2_PIN  D1   ///< PCAP_SEL2 - Connects to multiplexer S2 (pin 1)
-#define MUX_S3_PIN  D0   ///< PCAP_SEL3 - Connects to multiplexer S3 (pin 0)
+#define MUX_S0_PIN  D3   ///< PCAP_SEL0 - Connects to multiplexer S0
+#define MUX_S1_PIN  D2   ///< PCAP_SEL1 - Connects to multiplexer S1
+#define MUX_S2_PIN  D1   ///< PCAP_SEL2 - Connects to multiplexer S2
+#define MUX_S3_PIN  D0   ///< PCAP_SEL3 - Connects to multiplexer S3
 /** @} */
 
 /**

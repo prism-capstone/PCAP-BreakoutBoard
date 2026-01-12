@@ -88,7 +88,7 @@ bool PCAP_Driver::writeFirmware(pcap_chip_select_t chip, uint8_t* firmware, uint
     selectChip(PCAP_CHIP_NONE);
     SPI.endTransaction();
 
-    Serial.println("  Firmware upload complete");
+    Serial.println("Firmware upload complete");
 
     return true;
 }
@@ -173,8 +173,11 @@ bool PCAP_Driver::testCommunication(pcap_chip_select_t chip) {
     SPI.beginTransaction(spi_settings);
     selectChip(chip);
 
-    result = SPI.transfer((PCAP_TEST_READ >> 8) & 0xFF);
-    result = SPI.transfer((PCAP_TEST_READ) & 0xFF);
+    SPI.transfer(PCAP_TEST_READ);
+
+    // Give some time for the PCAP to respond
+    delayMicroseconds(1);
+    result = SPI.transfer(0x00);
 
     if (result == 0x11) {
         Serial.println("Communication test PASSED");
