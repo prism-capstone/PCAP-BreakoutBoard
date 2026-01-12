@@ -147,6 +147,11 @@ uint32_t PCAP_Driver::readSensor(pcap_chip_select_t chip, uint8_t sensor_num) {
     uint32_t result;
 
     SPI.transfer(PCAP_RD_RESULT | sensAdd[sensor_num]);
+    
+    // // Sending one after another (need to validate this too)
+    // SPI.transfer(PCAP_RD_RESULT);
+    // SPI.transfer(sensAdd[sensor_num]);
+    
     delayMicroseconds(1);
 
     for(int i = 0; i < sizeof(uint32_t); i++)

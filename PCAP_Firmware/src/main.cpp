@@ -89,6 +89,7 @@ void printResults();
 void printDiagnostics();
 
 void setup() {
+    bool testResult = false;
     Serial.begin(BAUD_RATE);
     delay(2000);  // Wait for serial monitor
 
@@ -105,24 +106,25 @@ void setup() {
 
     // Test communication with each chip
     Serial.println("\n--- Testing Communication ---");
+    for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
+    {
+        // Block until we validate a successful communication
+        while(testResult == false)
+        {
+            testResult = pcap.testCommunication((pcap_chip_select_t) pcap_num);
+            delay(10);
+        }
+    }
 
-    // pcap.initChip((pcap_chip_select_t) PCAP_CHIP_1);
-    // pcap.testCommunication(pcap_chip_select_t (PCAP_CHIP_1));
-
-    // for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
-    // {
-    //     pcap.testCommunication((pcap_chip_select_t) pcap_num);
-    // }
-    
     // Initialize chips
-    // Serial.println("\n--- Initializing Chips ---");
-    // for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
-    // {
-    //     pcap.initChip((pcap_chip_select_t) pcap_num);
-    //     pcap.writeFirmware((pcap_chip_select_t) pcap_num, standard_firmware, PCAP_FW_SIZE);
-    //     pcap.writeConfig((pcap_chip_select_t) pcap_num, standard_config, PCAP_CONFIG_SIZE);
-    //     pcap.startCDC((pcap_chip_select_t) pcap_num);
-    // }
+    Serial.println("\n--- Initializing Chips ---");
+    for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
+    {
+        pcap.initChip((pcap_chip_select_t) pcap_num);
+        pcap.writeFirmware((pcap_chip_select_t) pcap_num, standard_firmware, PCAP_FW_SIZE);
+        pcap.writeConfig((pcap_chip_select_t) pcap_num, standard_config, PCAP_CONFIG_SIZE);
+        pcap.startCDC((pcap_chip_select_t) pcap_num);
+    }
 }
 
 void loop() {
@@ -133,19 +135,14 @@ void loop() {
     if (current_time - last_measurement >= 10) {
         last_measurement = current_time;
         
-        for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_8; pcap_num++)
+        // Read results from each chip
+        for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
         {
-            pcap.testCommunication((pcap_chip_select_t) pcap_num);
+            pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
         }
         
-        // // Read results from each chip
-        // for(int pcap_num = PCAP_CHIP_1; pcap_num <= PCAP_CHIP_1; pcap_num++)
-        // {
-        //     pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
-        // }
-        
-        // // Print results
-        // printResults();
+        // Print results
+        printResults();
     }
 }
 
@@ -165,7 +162,7 @@ void printResults() {
     Serial.println("-----|----------|----------|----------|----------|----------|----------");
     
     // Print data for each chip
-    for (int chip = PCAP_CHIP_1; chip <= PCAP_CHIP_8; chip++) {
+    for (int chip = PCAP_CHIP_2; chip <= PCAP_CHIP_8; chip++) {
         Serial.print("  ");
         Serial.print(chip + 1);
         Serial.print("  | ");
