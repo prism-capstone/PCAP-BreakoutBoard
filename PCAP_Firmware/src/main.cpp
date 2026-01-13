@@ -1,10 +1,14 @@
 #include "pcap_driver.h"
+#include "ble_manager.h"
 #include "Arduino.h"
 
 #define BAUD_RATE 115200
 
 // Global PCAP driver instance
 PCAP_Driver pcap;
+
+// Global BLE manager instance
+BLEManager ble;
 
 // Storage for sensor data from all chips
 pcap_data_t chip_data[NUM_PCAP_CHIPS];
@@ -137,25 +141,41 @@ void setup() {
         pcap.calibratePCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
     }
 
+    // Initialize BLE
+    Serial.println("\n--- Initializing BLE ---");
+    ble.begin();
+
     Serial.println("\nSetup complete! Starting measurements...\n");
 }
 
 void loop() {
     static unsigned long last_measurement = 0;
+    static unsigned long last_ble_update = 0;
     unsigned long current_time = millis();
-    
+
     // Take measurement every 10ms (100Hz)
     if (current_time - last_measurement >= 10) {
         last_measurement = current_time;
-        
+
         // Read results from each chip
         for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
         {
             pcap.readPCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
         }
-        
+
         // Print results
         printResults();
+    }
+
+    // Send BLE updates every 50ms (20Hz) if connected
+    if (ble.isConnected() && (current_time - last_ble_update >= 50)) {
+        last_ble_update = current_time;
+
+        // Send data from all active chips
+        for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
+        {
+            ble.sendChipData(pcap_num, &chip_data[pcap_num]);
+        }
     }
 }
 
