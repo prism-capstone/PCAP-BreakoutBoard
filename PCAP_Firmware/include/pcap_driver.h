@@ -169,6 +169,17 @@ public:
      */
     bool testCommunication(pcap_chip_select_t chip);
 
+    /**
+     * @brief Calibrate PCAP sensors by capturing baseline offset values
+     * @param chip The chip to calibrate
+     * @param data Pointer to data structure for storing calibration offsets
+     *
+     * Reads current sensor values and stores them as offset values for calibration.
+     * This establishes a baseline that can be subtracted from future measurements
+     * to compensate for sensor drift or environmental variations.
+     */
+    void calibratePCAP(pcap_chip_select_t chip, pcap_data_t* data);
+
 private:
     SPISettings spi_settings; ///< SPI bus configuration settings
     MuxControl mux;     ///< Multiplexer control for chip selection

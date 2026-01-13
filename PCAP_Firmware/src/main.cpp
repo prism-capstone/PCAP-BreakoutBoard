@@ -125,6 +125,19 @@ void setup() {
         pcap.writeConfig((pcap_chip_select_t) pcap_num, standard_config, PCAP_CONFIG_SIZE);
         pcap.startCDC((pcap_chip_select_t) pcap_num);
     }
+
+    // Wait for first measurement to complete
+    Serial.println("\n--- Waiting for measurements to stabilize ---");
+    delay(20);  // Wait for CDC conversion (typically 5-10ms)
+
+    // Calibrate all chips
+    Serial.println("\n--- Calibrating Sensors ---");
+    for(int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++)
+    {
+        pcap.calibratePCAP((pcap_chip_select_t) pcap_num, &chip_data[pcap_num]);
+    }
+
+    Serial.println("\nSetup complete! Starting measurements...\n");
 }
 
 void loop() {
@@ -168,7 +181,7 @@ void printResults() {
         Serial.print("  | ");
         
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
-            uint32_t value = chip_data[chip].raw[sensor];
+            uint32_t value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
             
             // Print value with padding
             if (value < 10000000) Serial.print(" ");

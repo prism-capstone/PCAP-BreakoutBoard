@@ -148,17 +148,10 @@ uint32_t PCAP_Driver::readSensor(pcap_chip_select_t chip, uint8_t sensor_num) {
 
     SPI.transfer(PCAP_RD_RESULT | sensAdd[sensor_num]);
     
-    // // Sending one after another (need to validate this too)
-    // SPI.transfer(PCAP_RD_RESULT);
-    // SPI.transfer(sensAdd[sensor_num]);
-    
     delayMicroseconds(1);
 
-    for(int i = 0; i < sizeof(uint32_t); i++)
-    {
-        // Receieve 4 bytes
-        SPI.transferBytes(NULL, buffer, sizeof(uint32_t));
-    }
+    // Receieve 4 bytes
+    SPI.transferBytes(NULL, buffer, sizeof(uint32_t));
 
     result = (buffer[3]<<24) + (buffer[2]<<16) + (buffer[1]<<8) + (buffer[0]);
     return result;
@@ -198,3 +191,20 @@ bool PCAP_Driver::testCommunication(pcap_chip_select_t chip) {
     SPI.endTransaction();
     return testresult;
 }
+
+void PCAP_Driver::calibratePCAP(pcap_chip_select_t chip, pcap_data_t* data) {
+    Serial.print("Calibrating PCAP chip ");
+    Serial.println(chip);
+
+    // Read current sensor values
+    readPCAP(chip, data);
+
+    // Store raw values as offsets for calibration
+    for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
+        data->offset[i] = (float)data->raw[i];
+    }
+
+    Serial.println("Calibration complete");
+}
+
+
