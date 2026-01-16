@@ -1,0 +1,14 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "pcap_driver.c"
+        "mux_control.c"
+        "ble_manager.c"
+        "nn_inference.cpp"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        driver
+        nvs_flash
+        bt
+)

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(~/.platformio/penv/Scripts/platformio.exe run)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe pkg update -g)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe platform update espressif32)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe pkg uninstall -g -p espressif32 framework-espidf)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe pkg install:*)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe platform uninstall espressif32)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe platform install:*)"
+    ]
+  }
+}

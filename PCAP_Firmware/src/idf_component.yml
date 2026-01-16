@@ -1,0 +1,4 @@
+## IDF Component Manager configuration file for main component
+dependencies:
+  # Espressif's official TensorFlow Lite Micro port
+  espressif/esp-tflite-micro: "^1.3.1"
