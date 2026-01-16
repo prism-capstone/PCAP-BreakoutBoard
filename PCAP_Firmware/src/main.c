@@ -188,9 +188,9 @@ static void print_results(void)
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
-    // TickType_t last_ble_update = 0;
+    TickType_t last_ble_update = 0;
     const TickType_t measurement_period = pdMS_TO_TICKS(10);  // 100Hz
-    // const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
+    const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
 
     ESP_LOGI(TAG, "Sensor task started");
 
@@ -216,14 +216,14 @@ static void sensor_task(void *pvParameters)
         }
 
         // Send BLE updates every 50ms (20Hz) if connected
-        // if (ble_is_connected() && (current_time - last_ble_update) >= ble_update_period) {
-        //     last_ble_update = current_time;
+        if (ble_is_connected() && (current_time - last_ble_update) >= ble_update_period) {
+            last_ble_update = current_time;
 
-        //     // Send data from all active chips
-        //     for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
-        //         ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
-        //     }
-        // }
+            // Send data from all active chips
+            for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+                ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
+            }
+        }
 
         // Delay to allow other tasks to run
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -272,9 +272,9 @@ void app_main(void)
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
     }
 
-    // // Initialize BLE
-    // ESP_LOGI(TAG, "--- Initializing BLE ---");
-    // ble_manager_init();
+    // Initialize BLE
+    ESP_LOGI(TAG, "--- Initializing BLE ---");
+    ble_manager_init();
 
     // // Initialize Neural Network (optional - will gracefully fail if no model)
     // ESP_LOGI(TAG, "--- Initializing Neural Network ---");
