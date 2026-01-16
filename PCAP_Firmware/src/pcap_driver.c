@@ -220,16 +220,28 @@ bool pcap_test_communication(pcap_chip_select_t chip)
     return test_passed;
 }
 
-void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data)
+void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint8_t num_samples)
 {
-    ESP_LOGI(TAG, "Calibrating PCAP chip %d", chip);
+    ESP_LOGI(TAG, "Calibrating PCAP chip %d with %d samples", chip, num_samples);
 
-    // Read current sensor values
-    pcap_read_data(chip, data);
+    // Ensure at least 1 sample
+    if (num_samples == 0) {
+        num_samples = 1;
+    }
 
-    // Store raw values as offsets for calibration
+    // Accumulate sensor readings
+    uint64_t accumulator[NUM_SENSORS_PER_CHIP] = {0};
+
+    for (int sample = 0; sample < num_samples; sample++) {
+        pcap_read_data(chip, data);
+        for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
+            accumulator[i] += data->raw[i];
+        }
+    }
+
+    // Calculate average and store as calibration offsets
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->offset[i] = (float)data->raw[i];
+        data->offset[i] = (float)(accumulator[i] / num_samples);
     }
 
     ESP_LOGI(TAG, "Calibration complete for chip %d", chip);

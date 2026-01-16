@@ -169,7 +169,7 @@ static void print_results(void)
             uint32_t value;
             if (nn_is_ready()) {
                 value = chip_data[chip].final_val[sensor];
-            } 
+            }
             else {
                 value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
             }
@@ -269,7 +269,7 @@ void app_main(void)
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
     for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
-        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
+        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 16);
     }
 
     // Initialize BLE
