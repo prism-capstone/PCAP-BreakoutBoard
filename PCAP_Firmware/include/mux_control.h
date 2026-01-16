@@ -11,6 +11,9 @@
 
 #include <Arduino.h>
 
+// Uncomment the below to enable the newer iteration of mux pins
+#define OLD_PCAP_BOARD
+
 /**
  * @defgroup MuxPins Multiplexer Control Pins
  * @brief GPIO pins connected to CD74HC4067 multiplexer select lines
@@ -19,11 +22,18 @@
  * @{
  */
 
+#ifdef OLD_PCAP_BOARD
 // TODO: These pin assignments are based on the old schematic. Need to change for the new board.
-#define MUX_S0_PIN  D3   ///< PCAP_SEL0 - Connects to multiplexer S0
-#define MUX_S1_PIN  D2   ///< PCAP_SEL1 - Connects to multiplexer S1
-#define MUX_S2_PIN  D1   ///< PCAP_SEL2 - Connects to multiplexer S2
-#define MUX_S3_PIN  D0   ///< PCAP_SEL3 - Connects to multiplexer S3
+    #define MUX_S0_PIN  D3   ///< PCAP_SEL0 - Connects to multiplexer S0
+    #define MUX_S1_PIN  D2   ///< PCAP_SEL1 - Connects to multiplexer S1
+    #define MUX_S2_PIN  D1   ///< PCAP_SEL2 - Connects to multiplexer S2
+    #define MUX_S3_PIN  D0   ///< PCAP_SEL3 - Connects to multiplexer S3
+#else
+    #define MUX_S0_PIN  D4   ///< PCAP_SEL0 - Connects to multiplexer S0
+    #define MUX_S1_PIN  D3   ///< PCAP_SEL1 - Connects to multiplexer S1
+    #define MUX_S2_PIN  D2   ///< PCAP_SEL2 - Connects to multiplexer S2
+    #define MUX_S3_PIN  D1   ///< PCAP_SEL3 - Connects to multiplexer S3
+#endif
 /** @} */
 
 /**
