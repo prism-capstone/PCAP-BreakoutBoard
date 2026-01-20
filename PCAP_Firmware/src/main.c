@@ -23,9 +23,13 @@
 
 static const char* TAG = "MAIN";
 
+// Set to 1 to enable BLE test mode (skips PCAP, sends dummy data)
+#define BLE_TEST_MODE 1
+
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
 
+#if BLE_TEST_MODE == 0
 // Standard configuration (from original firmware)
 static const uint8_t standard_config[PCAP_CONFIG_SIZE] = {
     0x03, 0x11, 0xF8, 0x10, 0x90, 0x0C, 0x3F, 0x0A, 0x00, 0xF4, 0x01, 0x00, 0x27, 0x00, 0x0A, 0x00,
@@ -102,6 +106,7 @@ static const uint8_t standard_firmware[PCAP_FW_SIZE] = {
     0x08, 0x00, 0x47, 0x40, 0x00, 0x00, 0x00, 0x71, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+#endif
 
 // Function declarations
 static void print_diagnostics(void);
@@ -192,7 +197,12 @@ static void sensor_task(void *pvParameters)
     const TickType_t measurement_period = pdMS_TO_TICKS(10);  // 100Hz
     const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
 
+#if BLE_TEST_MODE
+    uint32_t dummy_counter = 0;
+    ESP_LOGI(TAG, "Sensor task started (BLE TEST MODE - dummy data)");
+#else
     ESP_LOGI(TAG, "Sensor task started");
+#endif
 
     while (1) {
         TickType_t current_time = xTaskGetTickCount();
@@ -201,6 +211,18 @@ static void sensor_task(void *pvParameters)
         if ((current_time - last_measurement) >= measurement_period) {
             last_measurement = current_time;
 
+#if BLE_TEST_MODE
+            // Generate dummy data for BLE testing
+            dummy_counter++;
+            for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+                for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
+                    // Generate varying dummy values based on chip, sensor, and counter
+                    chip_data[pcap_num].raw[sensor] = (pcap_num * 1000) + (sensor * 100) + (dummy_counter % 100);
+                    chip_data[pcap_num].offset[sensor] = 0;
+                    chip_data[pcap_num].final_val[sensor] = chip_data[pcap_num].raw[sensor];
+                }
+            }
+#else
             // Read results from each chip
             for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
                 pcap_read_data((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
@@ -210,6 +232,7 @@ static void sensor_task(void *pvParameters)
                     nn_compensate_chip(&chip_data[pcap_num]);
                 }
             }
+#endif
 
             // Print results to serial
             print_results();
@@ -232,11 +255,15 @@ static void sensor_task(void *pvParameters)
 
 void app_main(void)
 {
-    bool test_result = false;
-
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "PCAP04 ESP32C3 Firmware Starting...");
+#if BLE_TEST_MODE
+    ESP_LOGI(TAG, "*** BLE TEST MODE ENABLED ***");
+#endif
     ESP_LOGI(TAG, "========================================");
+
+#if !BLE_TEST_MODE
+    bool test_result = false;
 
     // Initialize PCAP driver (includes SPI and MUX init)
     pcap_driver_init();
@@ -271,6 +298,7 @@ void app_main(void)
     for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 16);
     }
+#endif
 
     // Initialize BLE
     ESP_LOGI(TAG, "--- Initializing BLE ---");
