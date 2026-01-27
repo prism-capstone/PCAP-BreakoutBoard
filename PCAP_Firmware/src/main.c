@@ -24,7 +24,7 @@
 static const char* TAG = "MAIN";
 
 // Set to 1 to enable BLE test mode (skips PCAP, sends dummy data)
-#define BLE_TEST_MODE 1
+#define BLE_TEST_MODE 0
 
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
@@ -171,15 +171,14 @@ static void print_results(void)
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
-            uint32_t value;
             if (nn_is_ready()) {
-                value = chip_data[chip].final_val[sensor];
+                uint32_t value = chip_data[chip].final_val[sensor];
+                printf("%ld | ", value);
             }
             else {
-                value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
+                float value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
+                printf("%f", value);
             }
-
-            printf("%ld | ", value);
         }
         printf("\n");
     }
@@ -233,7 +232,6 @@ static void sensor_task(void *pvParameters)
                 }
             }
 #endif
-
             // Print results to serial
             print_results();
         }
@@ -304,13 +302,13 @@ void app_main(void)
     ESP_LOGI(TAG, "--- Initializing BLE ---");
     ble_manager_init();
 
-    // // Initialize Neural Network (optional - will gracefully fail if no model)
-    // ESP_LOGI(TAG, "--- Initializing Neural Network ---");
-    // if (nn_init()) {
-    //     ESP_LOGI(TAG, "Neural network initialized successfully");
-    // } else {
-    //     ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
-    // }
+    // Initialize Neural Network (optional - will gracefully fail if no model)
+    ESP_LOGI(TAG, "--- Initializing Neural Network ---");
+    if (nn_init()) {
+        ESP_LOGI(TAG, "Neural network initialized successfully");
+    } else {
+        ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
+    }
 
     // Print diagnostics
     print_diagnostics();

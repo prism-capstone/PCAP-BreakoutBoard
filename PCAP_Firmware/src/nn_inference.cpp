@@ -15,8 +15,6 @@
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-// Include your model data here (generated from Python conversion)
-// TODO: Replace with your actual model file
 #include "model_data.h"
 
 static const char* TAG = "NN";
@@ -40,24 +38,27 @@ static uint32_t last_inference_time_us = 0;
 static uint32_t total_inference_time_us = 0;
 static uint32_t inference_count = 0;
 
+// Input scaler parameters (from scalers.json)
+// StandardScaler: normalized = (value - mean) / scale
+const float INPUT_SCALER_MEAN = 6.211888198269229f;
+const float INPUT_SCALER_SCALE = 0.9432810907691908f;
+
 // Op resolver - add only the operations your model needs to save memory
 // Common ops for hysteresis models: FULLY_CONNECTED, RELU, TANH, etc.
 static tflite::MicroMutableOpResolver<10> op_resolver;
+
+// Normalize input using StandardScaler parameters
+static inline float normalize_input(float raw_value)
+{
+    return (raw_value - INPUT_SCALER_MEAN) / INPUT_SCALER_SCALE;
+}
 
 bool nn_init(void)
 {
     ESP_LOGI(TAG, "Initializing neural network inference engine");
 
-#ifdef NN_MODEL_PLACEHOLDER
-    // Placeholder model - skip initialization
-    ESP_LOGW(TAG, "Using placeholder model - NN inference disabled");
-    ESP_LOGW(TAG, "Replace model_data.h with your trained model to enable NN");
-    nn_ready = false;
-    return false;
-#endif
-
     // Load the model
-    model = tflite::GetModel(g_model_data);
+    model = tflite::GetModel(model_int8_tflite);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
         ESP_LOGE(TAG, "Model schema version %lu does not match supported version %d",
                  model->version(), TFLITE_SCHEMA_VERSION);
@@ -112,7 +113,6 @@ void nn_compensate(const float* raw_input, float* compensated_output, int num_se
         return;
     }
 
-#ifndef NN_MODEL_PLACEHOLDER
     // Only run actual inference if we have a real model
     if (interpreter == nullptr || input_tensor == nullptr || output_tensor == nullptr) {
         for (int i = 0; i < num_sensors; i++) {
@@ -123,20 +123,22 @@ void nn_compensate(const float* raw_input, float* compensated_output, int num_se
 
     int64_t start_time = esp_timer_get_time();
 
+    // Normalize input data using StandardScaler parameters
     // Copy input data to input tensor
     // Handle both float and quantized (int8) models
     if (input_tensor->type == kTfLiteFloat32) {
         float* input_data = input_tensor->data.f;
         for (int i = 0; i < num_sensors && i < input_tensor->dims->data[1]; i++) {
-            input_data[i] = raw_input[i];
+            input_data[i] = normalize_input(raw_input[i]);
         }
     } else if (input_tensor->type == kTfLiteInt8) {
-        // For quantized models, apply quantization parameters
+        // For quantized models, normalize then apply quantization parameters
         int8_t* input_data = input_tensor->data.int8;
         float scale = input_tensor->params.scale;
         int zero_point = input_tensor->params.zero_point;
         for (int i = 0; i < num_sensors && i < input_tensor->dims->data[1]; i++) {
-            int32_t quantized = (int32_t)(raw_input[i] / scale) + zero_point;
+            float normalized = normalize_input(raw_input[i]);
+            int32_t quantized = (int32_t)(normalized / scale) + zero_point;
             // Clamp to int8 range
             if (quantized < -128) quantized = -128;
             if (quantized > 127) quantized = 127;
@@ -176,12 +178,6 @@ void nn_compensate(const float* raw_input, float* compensated_output, int num_se
     last_inference_time_us = (uint32_t)(end_time - start_time);
     total_inference_time_us += last_inference_time_us;
     inference_count++;
-#else
-    // Placeholder mode - just pass through
-    for (int i = 0; i < num_sensors; i++) {
-        compensated_output[i] = raw_input[i];
-    }
-#endif
 }
 
 void nn_compensate_chip(pcap_data_t* data)
@@ -194,10 +190,8 @@ void nn_compensate_chip(pcap_data_t* data)
         raw_floats[i] = (float)data->raw[i] - data->offset[i];
     }
 
-    // Run inference
     nn_compensate(raw_floats, compensated, NUM_SENSORS_PER_CHIP);
 
-    // Store results
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         data->final_val[i] = compensated[i];
     }
