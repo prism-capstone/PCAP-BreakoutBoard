@@ -21,7 +21,7 @@ static const char* TAG = "NN";
 
 // Tensor arena size - adjust based on your model's requirements
 // Start with 32KB and increase if needed
-constexpr int kTensorArenaSize = 32 * 1024;
+constexpr int kTensorArenaSize = 78 * 1024;
 
 // Aligned tensor arena for better performance
 static uint8_t tensor_arena[kTensorArenaSize] __attribute__((aligned(16)));
@@ -65,8 +65,8 @@ bool nn_init(void)
         return false;
     }
 
-    // Add operations used by your model
-    // TODO: Adjust these based on your actual model's operations
+    ESP_LOGI(TAG, "Model schema version OK");
+
     op_resolver.AddFullyConnected();
     op_resolver.AddRelu();
     op_resolver.AddTanh();
@@ -75,21 +75,34 @@ bool nn_init(void)
     op_resolver.AddQuantize();
     op_resolver.AddDequantize();
 
+    ESP_LOGI(TAG, "Creating interpreter with arena size: %d bytes", kTensorArenaSize);
+
     // Create the interpreter
     static tflite::MicroInterpreter static_interpreter(
         model, op_resolver, tensor_arena, kTensorArenaSize);
     interpreter = &static_interpreter;
 
+    ESP_LOGI(TAG, "Interpreter created, allocating tensors...");
+
     // Allocate tensors
     TfLiteStatus allocate_status = interpreter->AllocateTensors();
     if (allocate_status != kTfLiteOk) {
-        ESP_LOGE(TAG, "Failed to allocate tensors");
+        ESP_LOGE(TAG, "AllocateTensors failed with status: %d", allocate_status);
+        ESP_LOGE(TAG, "Arena size: %d, Arena used: %zu", 
+                 kTensorArenaSize, interpreter->arena_used_bytes());
         return false;
     }
+
+    ESP_LOGI(TAG, "Tensors allocated successfully");
 
     // Get input and output tensors
     input_tensor = interpreter->input(0);
     output_tensor = interpreter->output(0);
+
+    if (input_tensor == nullptr || output_tensor == nullptr) {
+        ESP_LOGE(TAG, "Failed to get input/output tensors");
+        return false;
+    }
 
     // Log tensor information
     ESP_LOGI(TAG, "Model loaded successfully");
@@ -97,7 +110,8 @@ bool nn_init(void)
              input_tensor->dims->size, input_tensor->type);
     ESP_LOGI(TAG, "Output tensor: dims=%d, type=%d",
              output_tensor->dims->size, output_tensor->type);
-    ESP_LOGI(TAG, "Arena used: %zu bytes", interpreter->arena_used_bytes());
+    ESP_LOGI(TAG, "Arena used: %zu bytes of %d bytes", 
+             interpreter->arena_used_bytes(), kTensorArenaSize);
 
     nn_ready = true;
     return true;

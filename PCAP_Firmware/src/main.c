@@ -7,6 +7,7 @@
  * the data via BLE to connected mobile applications.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -113,6 +114,55 @@ static void print_diagnostics(void);
 static void print_results(void);
 static void sensor_task(void *pvParameters);
 
+#if BLE_TEST_MODE
+/**
+ * @brief Generate dummy sensor data for BLE testing
+ * 
+ * Creates varying data patterns on 4 selected sensors:
+ * - Chip 2, Sensor 0: Increasing (0.0 to 100.0)
+ * - Chip 4, Sensor 2: Decreasing (100.0 to 0.0)
+ * - Chip 6, Sensor 4: Sine wave (0.0 to 100.0)
+ * - Chip 8, Sensor 5: Random values (0.0 to 100.0)
+ */
+static void generate_dummy_data(void)
+{
+    static float counter = 0.0f;
+    
+    // Reset all data to zero first
+    for (int chip = PCAP_CHIP_2; chip <= PCAP_CHIP_8; chip++) {
+        for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
+            chip_data[chip].final_val[sensor] = 0.0f;
+            chip_data[chip].raw[sensor] = 0;
+            chip_data[chip].offset[sensor] = 0;
+        }
+    }
+    
+    // Test sensor 1: Chip 2, Sensor 0 - Increasing value
+    chip_data[PCAP_CHIP_2].final_val[0] = fmodf(counter, 100.0f);
+    chip_data[PCAP_CHIP_2].raw[0] = (uint32_t)chip_data[PCAP_CHIP_2].final_val[0];
+    
+    // Test sensor 2: Chip 4, Sensor 2 - Decreasing value
+    chip_data[PCAP_CHIP_4].final_val[2] = 100.0f - fmodf(counter, 100.0f);
+    chip_data[PCAP_CHIP_4].raw[2] = (uint32_t)chip_data[PCAP_CHIP_4].final_val[2];
+    
+    // Test sensor 3: Chip 6, Sensor 4 - Sine wave
+    float sine_val = (sinf(counter * 0.1f) + 1.0f) * 50.0f;  // 0-100 range
+    chip_data[PCAP_CHIP_6].final_val[4] = sine_val;
+    chip_data[PCAP_CHIP_6].raw[4] = (uint32_t)sine_val;
+    
+    // Test sensor 4: Chip 8, Sensor 5 - Random values
+    float random_val = (float)(esp_random() % 10000) / 100.0f;  // 0-100 range
+    chip_data[PCAP_CHIP_8].final_val[5] = random_val;
+    chip_data[PCAP_CHIP_8].raw[5] = (uint32_t)random_val;
+    
+    // Increment counter for next iteration
+    counter += 1.0f;
+    if (counter >= 100.0f) {
+        counter = 0.0f;
+    }
+}
+#endif
+
 static void print_diagnostics(void)
 {
     esp_chip_info_t chip_info;
@@ -172,12 +222,12 @@ static void print_results(void)
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
             if (nn_is_ready()) {
-                uint32_t value = chip_data[chip].final_val[sensor];
-                printf("%ld | ", value);
+                float value = chip_data[chip].final_val[sensor];
+                printf("%f | ", value);
             }
             else {
-                float value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
-                printf("%f", value);
+                uint32_t value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
+                printf("%lu | ", value);
             }
         }
         printf("\n");
@@ -196,8 +246,7 @@ static void sensor_task(void *pvParameters)
     const TickType_t measurement_period = pdMS_TO_TICKS(10);  // 100Hz
     const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
 
-#if BLE_TEST_MODE
-    uint32_t dummy_counter = 0;
+#if BLE_TEST_MODE    
     ESP_LOGI(TAG, "Sensor task started (BLE TEST MODE - dummy data)");
 #else
     ESP_LOGI(TAG, "Sensor task started");
@@ -211,16 +260,8 @@ static void sensor_task(void *pvParameters)
             last_measurement = current_time;
 
 #if BLE_TEST_MODE
-            // Generate dummy data for BLE testing
-            dummy_counter++;
-            for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
-                for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
-                    // Generate varying dummy values based on chip, sensor, and counter
-                    chip_data[pcap_num].raw[sensor] = (pcap_num * 1000) + (sensor * 100) + (dummy_counter % 100);
-                    chip_data[pcap_num].offset[sensor] = 0;
-                    chip_data[pcap_num].final_val[sensor] = chip_data[pcap_num].raw[sensor];
-                }
-            }
+            // Generate dummy data for BLE transmission
+            generate_dummy_data();
 #else
             // Read results from each chip
             for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
@@ -304,6 +345,7 @@ void app_main(void)
 
     // Initialize Neural Network (optional - will gracefully fail if no model)
     ESP_LOGI(TAG, "--- Initializing Neural Network ---");
+
     if (nn_init()) {
         ESP_LOGI(TAG, "Neural network initialized successfully");
     } else {
