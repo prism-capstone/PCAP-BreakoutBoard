@@ -12,6 +12,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
@@ -20,7 +21,11 @@
 
 #include "pcap_driver.h"
 #include "ble_manager.h"
+#include "battery_manager.h"
 #include "nn_inference.h"
+
+// Add battery header if available
+// #include "battery.h"  // Uncomment when battery.h exists
 
 static const char* TAG = "MAIN";
 
@@ -29,6 +34,12 @@ static const char* TAG = "MAIN";
 
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
+
+// Battery monitoring configuration
+#define BATTERY_UPDATE_INTERVAL_MS 5000  // Update every 5 seconds
+
+// External battery function declaration
+extern uint8_t battery_get_percentage(void);
 
 #if BLE_TEST_MODE == 0
 // Standard configuration (from original firmware)
@@ -113,6 +124,7 @@ static const uint8_t standard_firmware[PCAP_FW_SIZE] = {
 static void print_diagnostics(void);
 static void print_results(void);
 static void sensor_task(void *pvParameters);
+static void battery_task(void *pvParameters);
 
 #if BLE_TEST_MODE
 /**
@@ -239,6 +251,46 @@ static void print_results(void)
     }
 }
 
+/**
+ * @brief Battery monitoring task
+ * 
+ * Periodically reads battery level and sends it over BLE.
+ * Runs independently from sensor task to avoid coupling.
+ */
+static void battery_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "Battery monitoring task started");
+    
+    TickType_t last_update = 0;
+    const TickType_t update_period = pdMS_TO_TICKS(BATTERY_UPDATE_INTERVAL_MS);
+    
+    // Wait a bit for system to initialize
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    
+    while (1) {
+        TickType_t current_time = xTaskGetTickCount();
+        
+        // Update battery level periodically
+        if ((current_time - last_update) >= update_period) {
+            last_update = current_time;
+            
+            // Read battery percentage
+            uint8_t battery_pct = battery_get_percentage();
+            
+            // Log battery level
+            ESP_LOGI(TAG, "Battery: %d", battery_pct);
+            
+            // Send over BLE if connected
+            if (ble_is_connected()) {
+                ble_send_battery(battery_pct);
+            }
+        }
+        
+        // Sleep for most of the period to save CPU
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
@@ -357,8 +409,11 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Setup complete! Starting measurements...");
 
-    // Create sensor task
+    // Create sensor task (high priority for time-critical measurements)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
+    
+    // Create battery monitoring task (lower priority, less time-critical)
+    xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {

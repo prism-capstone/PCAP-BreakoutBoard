@@ -4,6 +4,7 @@ idf_component_register(
         "pcap_driver.c"
         "mux_control.c"
         "ble_manager.c"
+        "battery_manager.c"
         "nn_inference.cpp"
     INCLUDE_DIRS
         "."

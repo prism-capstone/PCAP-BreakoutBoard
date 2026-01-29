@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 // Uncomment the below to enable the newer iteration of mux pins
-#define OLD_PCAP_BOARD
+#define OLD_PCAP_BOARD 1
 
 /**
  * @defgroup MuxPins Multiplexer Control Pins
@@ -27,7 +27,7 @@ extern "C" {
  * @{
  */
 
-#ifdef OLD_PCAP_BOARD
+#if OLD_PCAP_BOARD
 // Pin assignments for old board revision
 // XIAO ESP32C3: D0=GPIO2, D1=GPIO3, D2=GPIO4, D3=GPIO5
     #define MUX_S0_PIN  GPIO_NUM_5   ///< PCAP_SEL0 - D3
@@ -41,6 +41,7 @@ extern "C" {
     #define MUX_S2_PIN  GPIO_NUM_4   ///< PCAP_SEL2 - D2
     #define MUX_S3_PIN  GPIO_NUM_3   ///< PCAP_SEL3 - D1
 #endif
+
 /** @} */
 
 /**

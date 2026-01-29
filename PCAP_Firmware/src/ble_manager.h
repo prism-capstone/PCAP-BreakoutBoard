@@ -23,6 +23,7 @@ extern "C" {
  * @{
  */
 #define BLE_DEVICE_NAME         "PCAP-Sensor"
+#define BATTERY_OP_CODE         0xFF
 /** @} */
 
 /**
@@ -56,6 +57,14 @@ void ble_send_chip_data(uint8_t chip_num, pcap_data_t* data);
  * Sends a status or diagnostic message to the connected client.
  */
 void ble_send_status(const char* status);
+
+/**
+ * @brief Send update of battery percentage
+ * @param battery_percentage The percentage of battery remaining
+ *
+ * Sends the percentage of battery left on the LiPo
+ */
+void ble_send_battery(uint8_t battery_percentage);
 
 #ifdef __cplusplus
 }

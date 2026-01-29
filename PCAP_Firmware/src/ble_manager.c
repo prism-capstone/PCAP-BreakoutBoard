@@ -13,6 +13,7 @@
 #include "host/util/util.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "freertos/semphr.h"
 
 static const char* TAG = "BLE";
 
@@ -31,6 +32,9 @@ static const ble_uuid128_t sensor_data_uuid =
 static const ble_uuid128_t status_uuid =
     BLE_UUID128_INIT(0xa9, 0x26, 0x1b, 0x36, 0x07, 0xea, 0xf5, 0xb7,
                      0x88, 0x46, 0xe1, 0x36, 0x3e, 0x48, 0xb5, 0xbe);
+
+// Thread safety
+static SemaphoreHandle_t ble_mutex = NULL;
 
 // Connection state
 static bool device_connected = false;
@@ -111,8 +115,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                  event->connect.status == 0 ? "established" : "failed",
                  event->connect.status);
         if (event->connect.status == 0) {
-            device_connected = true;
-            conn_handle = event->connect.conn_handle;
+            if (xSemaphoreTake(ble_mutex, portMAX_DELAY) == pdTRUE) {
+                device_connected = true;
+                conn_handle = event->connect.conn_handle;
+                xSemaphoreGive(ble_mutex);
+            }
         } else {
             // Connection failed, restart advertising
             ble_on_sync();
@@ -121,8 +128,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "BLE disconnect; reason=%d", event->disconnect.reason);
-        device_connected = false;
-        conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        if (xSemaphoreTake(ble_mutex, portMAX_DELAY) == pdTRUE) {
+            device_connected = false;
+            conn_handle = BLE_HS_CONN_HANDLE_NONE;
+            xSemaphoreGive(ble_mutex);
+        }
         // Restart advertising
         ble_on_sync();
         break;
@@ -203,6 +213,13 @@ void ble_manager_init(void)
 {
     ESP_LOGI(TAG, "Initializing BLE manager");
 
+    // Create mutex for thread safety
+    ble_mutex = xSemaphoreCreateMutex();
+    if (ble_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create BLE mutex");
+        return;
+    }
+
     // Initialize NVS (required for BLE)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -250,12 +267,25 @@ void ble_manager_init(void)
 
 bool ble_is_connected(void)
 {
-    return device_connected;
+    bool connected;
+    if (xSemaphoreTake(ble_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        connected = device_connected;
+        xSemaphoreGive(ble_mutex);
+    } else {
+        connected = false;
+    }
+    return connected;
 }
 
 void ble_send_chip_data(uint8_t chip_num, pcap_data_t* data)
 {
+    // Take mutex with timeout to avoid blocking sensor task
+    if (xSemaphoreTake(ble_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return;
+    }
+
     if (!device_connected || conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        xSemaphoreGive(ble_mutex);
         return;
     }
 
@@ -280,11 +310,18 @@ void ble_send_chip_data(uint8_t chip_num, pcap_data_t* data)
     if (om) {
         ble_gatts_notify_custom(conn_handle, sensor_data_handle, om);
     }
+
+    xSemaphoreGive(ble_mutex);
 }
 
 void ble_send_status(const char* status)
 {
+    if (xSemaphoreTake(ble_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return;
+    }
+
     if (!device_connected || conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        xSemaphoreGive(ble_mutex);
         return;
     }
 
@@ -296,4 +333,32 @@ void ble_send_status(const char* status)
     if (om) {
         ble_gatts_notify_custom(conn_handle, status_handle, om);
     }
+
+    xSemaphoreGive(ble_mutex);
+}
+
+void ble_send_battery(uint8_t battery_percentage)
+{
+    if (xSemaphoreTake(ble_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return;
+    }
+
+    if (!device_connected || conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        xSemaphoreGive(ble_mutex);
+        return;
+    }
+
+    // Create battery packet
+    // Format: [0xFF][battery_percentage] = 2 bytes
+    uint8_t battery_data[2];
+    battery_data[0] = 0xFF;  // Battery message identifier
+    battery_data[1] = battery_percentage;
+
+    // Send notification using sensor data characteristic
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(battery_data, sizeof(battery_data));
+    if (om) {
+        ble_gatts_notify_custom(conn_handle, sensor_data_handle, om);
+    }
+
+    xSemaphoreGive(ble_mutex);
 }
