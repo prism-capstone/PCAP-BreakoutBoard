@@ -153,9 +153,6 @@ void nn_compensate(const float* raw_input, float* compensated_output, int num_se
         for (int i = 0; i < num_sensors && i < input_tensor->dims->data[1]; i++) {
             float normalized = normalize_input(raw_input[i]);
             int32_t quantized = (int32_t)(normalized / scale) + zero_point;
-            // Clamp to int8 range
-            if (quantized < -128) quantized = -128;
-            if (quantized > 127) quantized = 127;
             input_data[i] = (int8_t)quantized;
         }
     }
@@ -201,7 +198,7 @@ void nn_compensate_chip(pcap_data_t* data)
 
     // Convert raw values to float (with offset subtraction)
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        raw_floats[i] = (float)data->raw[i] - data->offset[i];
+        raw_floats[i] = data->raw[i] - data->offset[i];
     }
 
     nn_compensate(raw_floats, compensated, NUM_SENSORS_PER_CHIP);

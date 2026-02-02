@@ -170,17 +170,22 @@ void pcap_start_rdc(pcap_chip_select_t chip)
 
 void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data)
 {
+    float result;
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         mux_select_chip(chip);
-        data->raw[i] = pcap_read_sensor(chip, i);
+        result = pcap_read_sensor(chip, i);
         mux_select_chip(PCAP_CHIP_NONE);
+
+        if (data != NULL) {
+            data->raw[i] = result;
+        }
     }
 }
 
-uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
+float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
 {
     uint8_t buffer[4] = {0};
-    uint32_t result;
+    float result;
 
     // Note: chip should already be selected by pcap_read_data
     spi_transfer_byte(PCAP_RD_RESULT | sensor_addr[sensor_num]);
@@ -190,8 +195,8 @@ uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
     // Receive 4 bytes
     spi_transfer_bytes(NULL, buffer, 4);
 
-    result = ((uint32_t)buffer[3] << 24) | ((uint32_t)buffer[2] << 16) |
-             ((uint32_t)buffer[1] << 8) | buffer[0];
+    result = (buffer[3] << 24) | (buffer[2] << 16) |
+             (buffer[1] << 8) | buffer[0];
     return result;
 }
 
@@ -229,8 +234,13 @@ void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint8_t num_samp
         num_samples = 1;
     }
 
+    for (int sample = 0; sample < 10; sample++) {
+        // Toss away first 10 results
+        pcap_read_data(chip, NULL);
+    }
+
     // Accumulate sensor readings
-    uint64_t accumulator[NUM_SENSORS_PER_CHIP] = {0};
+    float accumulator[NUM_SENSORS_PER_CHIP] = {0};
 
     for (int sample = 0; sample < num_samples; sample++) {
         pcap_read_data(chip, data);
@@ -241,7 +251,7 @@ void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint8_t num_samp
 
     // Calculate average and store as calibration offsets
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->offset[i] = (float)(accumulator[i] / num_samples);
+        data->offset[i] = (float) (accumulator[i] / num_samples);
     }
 
     ESP_LOGI(TAG, "Calibration complete for chip %d", chip);

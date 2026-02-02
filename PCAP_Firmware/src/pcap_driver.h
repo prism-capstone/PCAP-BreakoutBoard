@@ -105,7 +105,7 @@ void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data);
  * @param sensor_num Sensor number (0-5)
  * @return 24-bit measurement value
  */
-uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num);
+float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num);
 
 /**
  * @brief Test SPI communication with a chip

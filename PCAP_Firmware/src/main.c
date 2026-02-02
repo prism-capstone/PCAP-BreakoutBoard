@@ -214,6 +214,7 @@ static void print_diagnostics(void)
 static void print_results(void)
 {
     static int print_counter = 0;
+    float value;
 
     // Only print every 50 measurements (every 500ms at 100Hz)
     print_counter++;
@@ -234,12 +235,12 @@ static void print_results(void)
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
             if (nn_is_ready()) {
-                float value = chip_data[chip].final_val[sensor];
+                value = chip_data[chip].final_val[sensor];
                 printf("%f | ", value);
             }
             else {
-                uint32_t value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
-                printf("%lu | ", value);
+                value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
+                printf("%f | ", value);
             }
         }
         printf("\n");
@@ -413,7 +414,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
+    // xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {
