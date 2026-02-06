@@ -214,7 +214,6 @@ static void print_diagnostics(void)
 static void print_results(void)
 {
     static int print_counter = 0;
-    float value;
 
     // Only print every 50 measurements (every 500ms at 100Hz)
     print_counter++;
@@ -234,14 +233,11 @@ static void print_results(void)
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
-            if (nn_is_ready()) {
-                value = chip_data[chip].final_val[sensor];
-                printf("%f | ", value);
+            if (!nn_is_ready()) {
+                chip_data[chip].final_val[sensor] = (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor]);            
             }
-            else {
-                value = chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor];
-                printf("%f | ", value);
-            }
+            float value = chip_data[chip].final_val[sensor];
+            printf("%.2f | ", value);
         }
         printf("\n");
     }
@@ -388,7 +384,7 @@ void app_main(void)
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
     for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
-        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 16);
+        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
     }
 #endif
 
@@ -399,11 +395,11 @@ void app_main(void)
     // Initialize Neural Network (optional - will gracefully fail if no model)
     ESP_LOGI(TAG, "--- Initializing Neural Network ---");
 
-    if (nn_init()) {
-        ESP_LOGI(TAG, "Neural network initialized successfully");
-    } else {
-        ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
-    }
+    // if (nn_init()) {
+    //     ESP_LOGI(TAG, "Neural network initialized successfully");
+    // } else {
+    //     ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
+    // }
 
     // Print diagnostics
     print_diagnostics();

@@ -81,9 +81,9 @@ extern "C" {
  * and offset corrections for all sensors on a single PCAP04 chip.
  */
 typedef struct {
-    float raw[NUM_SENSORS_PER_CHIP];        ///< Raw 24-bit measurement values from ADC
+    uint32_t raw[NUM_SENSORS_PER_CHIP];     ///< Raw 24-bit measurement values from ADC
     float final_val[NUM_SENSORS_PER_CHIP];  ///< Calibrated/processed measurement values
-    float offset[NUM_SENSORS_PER_CHIP];     ///< Offset correction values for calibration
+    uint32_t offset[NUM_SENSORS_PER_CHIP];     ///< Offset correction values for calibration
 } pcap_data_t;
 
 #ifdef __cplusplus

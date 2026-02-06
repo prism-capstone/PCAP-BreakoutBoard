@@ -182,10 +182,9 @@ void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data)
     }
 }
 
-float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
+uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
 {
     uint8_t buffer[4] = {0};
-    float result;
 
     // Note: chip should already be selected by pcap_read_data
     spi_transfer_byte(PCAP_RD_RESULT | sensor_addr[sensor_num]);
@@ -195,9 +194,8 @@ float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
     // Receive 4 bytes
     spi_transfer_bytes(NULL, buffer, 4);
 
-    result = (buffer[3] << 24) | (buffer[2] << 16) |
-             (buffer[1] << 8) | buffer[0];
-    return result;
+    uint32_t raw = ((uint32_t)buffer[3] << 24) | ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[1] <<  8) | ((uint32_t)buffer[0] <<  0);
+    return raw;
 }
 
 bool pcap_test_communication(pcap_chip_select_t chip)
@@ -225,33 +223,22 @@ bool pcap_test_communication(pcap_chip_select_t chip)
     return test_passed;
 }
 
-void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint8_t num_samples)
+void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data)
 {
-    ESP_LOGI(TAG, "Calibrating PCAP chip %d with %d samples", chip, num_samples);
+    ESP_LOGI(TAG, "Calibrating PCAP chip %d (single-sample)", chip);
 
-    // Ensure at least 1 sample
-    if (num_samples == 0) {
-        num_samples = 1;
+    if (data == NULL) {
+        ESP_LOGE(TAG, "pcap_calibrate called with NULL data pointer");
+        return;
     }
 
-    for (int sample = 0; sample < 10; sample++) {
-        // Toss away first 10 results
-        pcap_read_data(chip, NULL);
-    }
+    // Take exactly one reading
+    pcap_read_data(chip, data);
 
-    // Accumulate sensor readings
-    float accumulator[NUM_SENSORS_PER_CHIP] = {0};
-
-    for (int sample = 0; sample < num_samples; sample++) {
-        pcap_read_data(chip, data);
-        for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-            accumulator[i] += data->raw[i];
-        }
-    }
-
-    // Calculate average and store as calibration offsets
+    // Store that reading as the offset
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->offset[i] = (float) (accumulator[i] / num_samples);
+        data->offset[i] = data->raw[i];
+        ESP_LOGI(TAG, "Calibration complete for chip, dataoffset is: %d", data->offset[i]);
     }
 
     ESP_LOGI(TAG, "Calibration complete for chip %d", chip);

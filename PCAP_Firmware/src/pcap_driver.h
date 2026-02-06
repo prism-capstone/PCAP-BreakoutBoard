@@ -105,7 +105,7 @@ void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data);
  * @param sensor_num Sensor number (0-5)
  * @return 24-bit measurement value
  */
-float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num);
+uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num);
 
 /**
  * @brief Test SPI communication with a chip
@@ -118,9 +118,8 @@ bool pcap_test_communication(pcap_chip_select_t chip);
  * @brief Calibrate PCAP sensors by capturing baseline offset values
  * @param chip The chip to calibrate
  * @param data Pointer to data structure for storing calibration offsets
- * @param num_samples Number of samples to average for calibration (minimum 1)
  */
-void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint8_t num_samples);
+void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data);
 
 #ifdef __cplusplus
 }
