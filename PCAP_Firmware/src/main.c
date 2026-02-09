@@ -233,11 +233,13 @@ static void print_results(void)
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
-            if (!nn_is_ready()) {
-                chip_data[chip].final_val[sensor] = (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor]);            
-            }
-            float value = chip_data[chip].final_val[sensor];
-            printf("%.2f | ", value);
+            // if (!nn_is_ready()) {
+            //     chip_data[chip].final_val[sensor] = (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor]);            
+            // }
+            // float value = chip_data[chip].final_val[sensor];
+            // printf("%.2f | ", value);
+
+            printf("%f | ", (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER));
         }
         printf("\n");
     }

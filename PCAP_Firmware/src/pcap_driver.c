@@ -170,7 +170,7 @@ void pcap_start_rdc(pcap_chip_select_t chip)
 
 void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data)
 {
-    uint32_t result;
+    float result;
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         mux_select_chip(chip);
         result = pcap_read_sensor(chip, i);
@@ -182,7 +182,7 @@ void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data)
     }
 }
 
-uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
+float pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
 {
     uint8_t buffer[4] = {0};
 
@@ -195,7 +195,7 @@ uint32_t pcap_read_sensor(pcap_chip_select_t chip, uint8_t sensor_num)
     spi_transfer_bytes(NULL, buffer, 4);
 
     uint32_t raw = ((uint32_t)buffer[3] << 24) | ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[1] <<  8) | ((uint32_t)buffer[0] <<  0);
-    return raw;
+    return (float)raw;
 }
 
 bool pcap_test_communication(pcap_chip_select_t chip)
@@ -225,8 +225,6 @@ bool pcap_test_communication(pcap_chip_select_t chip)
 
 void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint16_t num_samples)
 {
-    ESP_LOGI(TAG, "Calibrating PCAP chip %d (%d samples)", chip, num_samples);
-
     if (data == NULL) {
         ESP_LOGE(TAG, "pcap_calibrate called with NULL data pointer");
         return;
@@ -239,7 +237,7 @@ void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint16_t num_sam
 
     uint64_t accumulator[NUM_SENSORS_PER_CHIP] = {0};
 
-    for (uint16_t s = 0; s < num_samples; s++) {
+    for (int s = 0; s < num_samples; s++) {
         pcap_read_data(chip, data);
         for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
             accumulator[i] += data->raw[i];

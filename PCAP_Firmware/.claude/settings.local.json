@@ -7,7 +7,9 @@
       "Bash(~/.platformio/penv/Scripts/platformio.exe pkg uninstall -g -p espressif32 framework-espidf)",
       "Bash(~/.platformio/penv/Scripts/platformio.exe pkg install:*)",
       "Bash(~/.platformio/penv/Scripts/platformio.exe platform uninstall espressif32)",
-      "Bash(~/.platformio/penv/Scripts/platformio.exe platform install:*)"
+      "Bash(~/.platformio/penv/Scripts/platformio.exe platform install:*)",
+      "Bash(C:UsersJoel.platformiopenv.espidf-5.5.0Scriptspython.exe -m pip install -r C:UsersJoel.platformiopackagesframework-espidftoolsrequirementsrequirements.core.txt)",
+      "Bash(cmd /c \"C:\\\\Users\\\\Joel\\\\.platformio\\\\penv\\\\.espidf-5.5.0\\\\Scripts\\\\python.exe -m pip install -r C:\\\\Users\\\\Joel\\\\.platformio\\\\packages\\\\framework-espidf\\\\tools\\\\requirements\\\\requirements.core.txt\")"
     ]
   }
 }
