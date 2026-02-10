@@ -4,6 +4,7 @@
  */
 
 #include "ble_manager.h"
+#include "pcap_driver.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_nimble_hci.h"
@@ -292,19 +293,17 @@ void ble_send_chip_data(uint8_t chip_num, pcap_data_t* data)
     // Create data packet
     // Format: [chip_num][sensor0_4B]...[sensor5_4B] = 25 bytes
     sensor_data_val[0] = chip_num;
-
+    
     int idx = 1;
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         // Calculate calibrated value
-        int32_t calibrated = (int32_t)(data->raw[i] - data->offset[i]);
-
-        // Pack as 4 bytes (32-bit signed integer, big-endian)
-        sensor_data_val[idx++] = (calibrated >> 24) & 0xFF;
-        sensor_data_val[idx++] = (calibrated >> 16) & 0xFF;
-        sensor_data_val[idx++] = (calibrated >> 8) & 0xFF;
-        sensor_data_val[idx++] = calibrated & 0xFF;
+        float calibrated = (100 * (float)(data->raw[i] - data->offset[i])/PCAP_CONVERSION_NUMBER);
+    
+        // Pack float as 4 bytes (IEEE 754, little-endian)
+        memcpy(&sensor_data_val[idx], &calibrated, sizeof(float));
+        idx += sizeof(float);
     }
-
+    
     // Send notification
     struct os_mbuf *om = ble_hs_mbuf_from_flat(sensor_data_val, sizeof(sensor_data_val));
     if (om) {
