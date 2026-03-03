@@ -86,7 +86,7 @@ static uint8_t spi_transmit_u8(pcap_chip_select_t chip, uint8_t data)
     mux_select_chip(chip);
     rx = spi_transfer_byte(data);
     esp_rom_delay_us(1);
-    mux_select_chip(PCAP_CHIP_NONE);
+    mux_deselect_chip();
     esp_rom_delay_us(1);
     return rx;
 }
@@ -120,7 +120,7 @@ bool pcap_write_firmware(pcap_chip_select_t chip, const uint8_t* firmware, uint1
         spi_transfer_byte(firmware[i]);
     }
 
-    mux_select_chip(PCAP_CHIP_NONE);
+    mux_deselect_chip();
 
     ESP_LOGI(TAG, "Firmware upload complete for chip %d", chip);
     return true;
@@ -141,7 +141,7 @@ bool pcap_write_config(pcap_chip_select_t chip, const uint8_t* config, uint16_t 
         spi_transfer_byte(config[i]);
     }
 
-    mux_select_chip(PCAP_CHIP_NONE);
+    mux_deselect_chip();
 
     // Allow config to settle
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -174,7 +174,7 @@ void pcap_read_data(pcap_chip_select_t chip, pcap_data_t* data)
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         mux_select_chip(chip);
         result = pcap_read_sensor(chip, i);
-        mux_select_chip(PCAP_CHIP_NONE);
+        mux_deselect_chip();
 
         if (data != NULL) {
             data->raw[i] = result;
@@ -219,7 +219,7 @@ bool pcap_test_communication(pcap_chip_select_t chip)
         test_passed = false;
     }
 
-    mux_select_chip(PCAP_CHIP_NONE);
+    mux_deselect_chip();
     return test_passed;
 }
 

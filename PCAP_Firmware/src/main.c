@@ -214,6 +214,7 @@ static void print_diagnostics(void)
 static void print_results(void)
 {
     static int print_counter = 0;
+    float value = 0;
 
     // Only print every 50 measurements (every 500ms at 100Hz)
     print_counter++;
@@ -239,7 +240,13 @@ static void print_results(void)
             // float value = chip_data[chip].final_val[sensor];
             // printf("%.2f | ", value);
 
-            printf("%f | ", (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER));
+            value = (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);
+            if (value > 1.0) 
+            {
+                printf("%f | ", value);
+            } else {
+                printf(" | 0.00000");
+            }
         }
         printf("\n");
     }
@@ -412,7 +419,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    // xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
+    xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {

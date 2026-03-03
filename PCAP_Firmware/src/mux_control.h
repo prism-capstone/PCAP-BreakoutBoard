@@ -79,6 +79,13 @@ void mux_init(void);
 void mux_select_chip(pcap_chip_select_t chip);
 
 /**
+ * @brief Select a specific PCAP chip through the multiplexer
+ *
+ * Sets the multiplexer to PCAP_CHIP_NONE
+ */
+void mux_deselect_chip();
+
+/**
  * @brief Get the currently selected chip
  * @return The currently selected PCAP chip identifier
  */

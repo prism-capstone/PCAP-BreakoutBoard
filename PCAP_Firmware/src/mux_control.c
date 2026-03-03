@@ -22,7 +22,7 @@ void mux_init(void)
     gpio_config(&io_conf);
 
     // Deselect all initially
-    mux_select_chip(PCAP_CHIP_NONE);
+    mux_deselect_chip();
 }
 
 void mux_select_chip(pcap_chip_select_t chip)
@@ -37,6 +37,11 @@ void mux_select_chip(pcap_chip_select_t chip)
 
     // Small delay to allow mux to settle (10 microseconds)
     esp_rom_delay_us(10);
+}
+
+void mux_deselect_chip() 
+{
+    mux_select_chip(PCAP_CHIP_NONE);
 }
 
 pcap_chip_select_t mux_get_current_chip(void)
