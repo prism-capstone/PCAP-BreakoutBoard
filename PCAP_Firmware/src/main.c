@@ -320,7 +320,7 @@ static void sensor_task(void *pvParameters)
 
                 // Apply NN-based hysteresis compensation
                 if (nn_is_ready()) {
-                    nn_compensate_chip(&chip_data[pcap_num]);
+                    nn_compensate_chip(&chip_data[pcap_num], pcap_num);
                 }
             }
 #endif

@@ -1,0 +1,13 @@
+{
+  "window": 400,
+  "include_derivative": false,
+  "include_time": false,
+  "cap": {
+    "mean": [
+      6.191217956661442
+    ],
+    "scale": [
+      0.9138432435934595
+    ]
+  }
+}

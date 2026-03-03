@@ -28,24 +28,16 @@ extern "C" {
 bool nn_init(void);
 
 /**
- * @brief Run inference to compensate for hysteresis on a single sensor value
+ * @brief Run windowed inference on a full chip's data
  *
- * @param raw_input Scaled sensor reading
- * @return Hysteresis-compensated value (passthrough if NN not ready)
+ * Maintains a 400-sample circular buffer per sensor and runs inference
+ * once the window is full. Passes through raw values until then.
+ *
+ * @param data     Pointer to PCAP data structure (raw/offset used as input,
+ *                 final_val updated with compensated output)
+ * @param chip_idx Chip index (used to select the correct sample buffer)
  */
-float nn_compensate(float raw_input);
-
-/**
- * @brief Run inference on a full chip's data
- *
- * Convenience function that processes all sensors for one PCAP chip.
- * Updates the final_val field in the pcap_data structure with
- * hysteresis-compensated values.
- *
- * @param data Pointer to PCAP data structure (raw values used as input,
- *             final_val updated with compensated output)
- */
-void nn_compensate_chip(pcap_data_t* data);
+void nn_compensate_chip(pcap_data_t* data, int chip_idx);
 
 /**
  * @brief Check if the neural network is ready for inference

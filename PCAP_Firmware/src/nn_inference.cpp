@@ -38,10 +38,18 @@ static uint32_t last_inference_time_us = 0;
 static uint32_t total_inference_time_us = 0;
 static uint32_t inference_count = 0;
 
+// Sliding window size (from scalers.json "window": 400)
+#define NN_WINDOW_SIZE 400
+
+// Circular buffer: one ring per sensor per chip
+static float sensor_buffers[NUM_PCAP_CHIPS][NUM_SENSORS_PER_CHIP][NN_WINDOW_SIZE];
+static int   buffer_head[NUM_PCAP_CHIPS][NUM_SENSORS_PER_CHIP];   // next write index
+static int   buffer_count[NUM_PCAP_CHIPS][NUM_SENSORS_PER_CHIP];  // samples stored (0..NN_WINDOW_SIZE)
+
 // Input scaler parameters (from scalers.json)
 // StandardScaler: normalized = (value - mean) / scale
-const float INPUT_SCALER_MEAN = 6.211888198269229f;
-const float INPUT_SCALER_SCALE = 0.9432810907691908f;
+const float INPUT_SCALER_MEAN = 6.191217956661442f;
+const float INPUT_SCALER_SCALE = 0.9138432435934595f;
 
 // Op resolver - add only the operations your model needs to save memory
 // Common ops for hysteresis models: FULLY_CONNECTED, RELU, TANH, etc.
@@ -117,60 +125,67 @@ bool nn_init(void)
     return true;
 }
 
-float nn_compensate(float raw_input)
-{
-    if (!nn_ready || interpreter == nullptr || input_tensor == nullptr || output_tensor == nullptr) {
-        return raw_input;
-    }
-
-    int64_t start_time = esp_timer_get_time();
-
-    // Write normalized input to tensor
-    float normalized = normalize_input(raw_input);
-    if (input_tensor->type == kTfLiteFloat32) {
-        input_tensor->data.f[0] = normalized;
-    } else if (input_tensor->type == kTfLiteInt8) {
-        float scale = input_tensor->params.scale;
-        int zero_point = input_tensor->params.zero_point;
-        input_tensor->data.int8[0] = (int8_t)((int32_t)(normalized / scale) + zero_point);
-    }
-
-    // Run inference
-    TfLiteStatus invoke_status = interpreter->Invoke();
-    if (invoke_status != kTfLiteOk) {
-        ESP_LOGW(TAG, "Inference failed");
-        return raw_input;
-    }
-
-    // Read output from tensor
-    float result = raw_input;
-    if (output_tensor->type == kTfLiteFloat32) {
-        result = output_tensor->data.f[0];
-    } else if (output_tensor->type == kTfLiteInt8) {
-        float scale = output_tensor->params.scale;
-        int zero_point = output_tensor->params.zero_point;
-        result = (output_tensor->data.int8[0] - zero_point) * scale;
-    }
-
-    // Track timing
-    int64_t end_time = esp_timer_get_time();
-    last_inference_time_us = (uint32_t)(end_time - start_time);
-    total_inference_time_us += last_inference_time_us;
-    inference_count++;
-
-    // Debug: log every 500th call to avoid flooding serial
-    if (inference_count % 500 == 0) {
-        ESP_LOGI(TAG, "NN: raw_in=%.4f  normalized=%.4f  raw_out=%.4f", raw_input, normalized, result);
-    }
-
-    return result;
-}
-
-void nn_compensate_chip(pcap_data_t* data)
+void nn_compensate_chip(pcap_data_t* data, int chip_idx)
 {
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         float input = (PCAP_SCALING_NUM * (float)(data->raw[i] - data->offset[i])) / PCAP_CONVERSION_NUMBER;
-        data->final_val[i] = nn_compensate(input);
+
+        // Push sample into circular buffer
+        sensor_buffers[chip_idx][i][buffer_head[chip_idx][i]] = input;
+        buffer_head[chip_idx][i] = (buffer_head[chip_idx][i] + 1) % NN_WINDOW_SIZE;
+        if (buffer_count[chip_idx][i] < NN_WINDOW_SIZE) {
+            buffer_count[chip_idx][i]++;
+        }
+
+        // Pass through until the window is fully populated (~4 seconds at 100Hz)
+        if (!nn_ready || buffer_count[chip_idx][i] < NN_WINDOW_SIZE) {
+            data->final_val[i] = input;
+            continue;
+        }
+
+        int64_t start_time = esp_timer_get_time();
+
+        // Fill input tensor with the window oldest→newest
+        int oldest = buffer_head[chip_idx][i];  // head points to oldest when buffer is full
+        if (input_tensor->type == kTfLiteFloat32) {
+            float* input_data = input_tensor->data.f;
+            for (int j = 0; j < NN_WINDOW_SIZE; j++) {
+                int buf_idx = (oldest + j) % NN_WINDOW_SIZE;
+                input_data[j] = normalize_input(sensor_buffers[chip_idx][i][buf_idx]);
+            }
+        } else if (input_tensor->type == kTfLiteInt8) {
+            int8_t* input_data = input_tensor->data.int8;
+            float q_scale = input_tensor->params.scale;
+            int q_zero = input_tensor->params.zero_point;
+            for (int j = 0; j < NN_WINDOW_SIZE; j++) {
+                int buf_idx = (oldest + j) % NN_WINDOW_SIZE;
+                float norm = normalize_input(sensor_buffers[chip_idx][i][buf_idx]);
+                input_data[j] = (int8_t)((int32_t)(norm / q_scale) + q_zero);
+            }
+        }
+
+        // Run inference
+        TfLiteStatus invoke_status = interpreter->Invoke();
+        if (invoke_status != kTfLiteOk) {
+            ESP_LOGW(TAG, "Inference failed chip=%d sensor=%d", chip_idx, i);
+            data->final_val[i] = input;
+            continue;
+        }
+
+        // Read output
+        if (output_tensor->type == kTfLiteFloat32) {
+            data->final_val[i] = output_tensor->data.f[0];
+        } else if (output_tensor->type == kTfLiteInt8) {
+            float q_scale = output_tensor->params.scale;
+            int q_zero = output_tensor->params.zero_point;
+            data->final_val[i] = (output_tensor->data.int8[0] - q_zero) * q_scale;
+        }
+
+        // Track timing
+        int64_t end_time = esp_timer_get_time();
+        last_inference_time_us = (uint32_t)(end_time - start_time);
+        total_inference_time_us += last_inference_time_us;
+        inference_count++;
     }
 }
 
