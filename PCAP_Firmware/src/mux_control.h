@@ -16,9 +16,6 @@
 extern "C" {
 #endif
 
-// Uncomment the below to enable the newer iteration of mux pins
-#define OLD_PCAP_BOARD 1
-
 /**
  * @defgroup MuxPins Multiplexer Control Pins
  * @brief GPIO pins connected to CD74HC4067 multiplexer select lines
@@ -27,20 +24,10 @@ extern "C" {
  * @{
  */
 
-#if OLD_PCAP_BOARD
-// Pin assignments for old board revision
-// XIAO ESP32C3: D0=GPIO2, D1=GPIO3, D2=GPIO4, D3=GPIO5
-    #define MUX_S0_PIN  GPIO_NUM_5   ///< PCAP_SEL0 - D3
-    #define MUX_S1_PIN  GPIO_NUM_4   ///< PCAP_SEL1 - D2
-    #define MUX_S2_PIN  GPIO_NUM_3   ///< PCAP_SEL2 - D1
-    #define MUX_S3_PIN  GPIO_NUM_2   ///< PCAP_SEL3 - D0
-#else
 // Pin assignments for new board revision
-    #define MUX_S0_PIN  GPIO_NUM_6   ///< PCAP_SEL0 - D4
-    #define MUX_S1_PIN  GPIO_NUM_5   ///< PCAP_SEL1 - D3
-    #define MUX_S2_PIN  GPIO_NUM_4   ///< PCAP_SEL2 - D2
-    #define MUX_S3_PIN  GPIO_NUM_3   ///< PCAP_SEL3 - D1
-#endif
+#define MUX_S0_PIN  GPIO_NUM_6   ///< PCAP_SEL0 - D4
+#define MUX_S1_PIN  GPIO_NUM_5   ///< PCAP_SEL1 - D3
+#define MUX_S2_PIN  GPIO_NUM_4   ///< PCAP_SEL2 - D2
 
 /** @} */
 
@@ -58,8 +45,7 @@ typedef enum {
     PCAP_CHIP_5 = 4,        ///< PCAP chip 5 (mux channel 4)
     PCAP_CHIP_6 = 5,        ///< PCAP chip 6 (mux channel 5)
     PCAP_CHIP_7 = 6,        ///< PCAP chip 7 (mux channel 6)
-    PCAP_CHIP_8 = 7,        ///< PCAP chip 8 (mux channel 7)
-    PCAP_CHIP_NONE = 15     ///< No chip selected / invalid selection
+    PCAP_CHIP_NONE = 7     ///< No chip selected / invalid selection
 } pcap_chip_select_t;
 
 /**

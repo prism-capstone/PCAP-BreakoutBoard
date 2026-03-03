@@ -13,7 +13,7 @@ void mux_init(void)
     // Configure GPIO pins as outputs
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << MUX_S0_PIN) | (1ULL << MUX_S1_PIN) |
-                        (1ULL << MUX_S2_PIN) | (1ULL << MUX_S3_PIN),
+                        (1ULL << MUX_S2_PIN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -31,7 +31,6 @@ void mux_select_chip(pcap_chip_select_t chip)
     gpio_set_level(MUX_S0_PIN, (chip & 0x01) ? 1 : 0);
     gpio_set_level(MUX_S1_PIN, (chip & 0x02) ? 1 : 0);
     gpio_set_level(MUX_S2_PIN, (chip & 0x04) ? 1 : 0);
-    gpio_set_level(MUX_S3_PIN, (chip & 0x08) ? 1 : 0);
 
     current_chip = chip;
 

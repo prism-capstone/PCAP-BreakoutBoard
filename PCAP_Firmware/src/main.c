@@ -41,7 +41,6 @@ static pcap_data_t chip_data[NUM_PCAP_CHIPS];
 // External battery function declaration
 extern uint8_t battery_get_percentage(void);
 
-#if BLE_TEST_MODE == 0
 // Standard configuration (from original firmware)
 static const uint8_t standard_config[PCAP_CONFIG_SIZE] = {
     0x03, 0x11, 0xF8, 0x10, 0x90, 0x0C, 0x3F, 0x0A, 0x00, 0xF4, 0x01, 0x00, 0x27, 0x00, 0x0A, 0x00,
@@ -118,62 +117,12 @@ static const uint8_t standard_firmware[PCAP_FW_SIZE] = {
     0x08, 0x00, 0x47, 0x40, 0x00, 0x00, 0x00, 0x71, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
-#endif
 
 // Function declarations
 static void print_diagnostics(void);
 static void print_results(void);
 static void sensor_task(void *pvParameters);
 static void battery_task(void *pvParameters);
-
-#if BLE_TEST_MODE
-/**
- * @brief Generate dummy sensor data for BLE testing
- * 
- * Creates varying data patterns on 4 selected sensors:
- * - Chip 2, Sensor 0: Increasing (0.0 to 100.0)
- * - Chip 4, Sensor 2: Decreasing (100.0 to 0.0)
- * - Chip 6, Sensor 4: Sine wave (0.0 to 100.0)
- * - Chip 8, Sensor 5: Random values (0.0 to 100.0)
- */
-static void generate_dummy_data(void)
-{
-    static float counter = 0.0f;
-    
-    // Reset all data to zero first
-    for (int chip = PCAP_CHIP_2; chip <= PCAP_CHIP_8; chip++) {
-        for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
-            chip_data[chip].final_val[sensor] = 0.0f;
-            chip_data[chip].raw[sensor] = 0;
-            chip_data[chip].offset[sensor] = 0;
-        }
-    }
-    
-    // Test sensor 1: Chip 2, Sensor 0 - Increasing value
-    chip_data[PCAP_CHIP_2].final_val[0] = fmodf(counter, 100.0f);
-    chip_data[PCAP_CHIP_2].raw[0] = (uint32_t)chip_data[PCAP_CHIP_2].final_val[0];
-    
-    // Test sensor 2: Chip 4, Sensor 2 - Decreasing value
-    chip_data[PCAP_CHIP_4].final_val[2] = 100.0f - fmodf(counter, 100.0f);
-    chip_data[PCAP_CHIP_4].raw[2] = (uint32_t)chip_data[PCAP_CHIP_4].final_val[2];
-    
-    // Test sensor 3: Chip 6, Sensor 4 - Sine wave
-    float sine_val = (sinf(counter * 0.1f) + 1.0f) * 50.0f;  // 0-100 range
-    chip_data[PCAP_CHIP_6].final_val[4] = sine_val;
-    chip_data[PCAP_CHIP_6].raw[4] = (uint32_t)sine_val;
-    
-    // Test sensor 4: Chip 8, Sensor 5 - Random values
-    float random_val = (float)(esp_random() % 10000) / 100.0f;  // 0-100 range
-    chip_data[PCAP_CHIP_8].final_val[5] = random_val;
-    chip_data[PCAP_CHIP_8].raw[5] = (uint32_t)random_val;
-    
-    // Increment counter for next iteration
-    counter += 1.0f;
-    if (counter >= 100.0f) {
-        counter = 0.0f;
-    }
-}
-#endif
 
 static void print_diagnostics(void)
 {
@@ -199,7 +148,6 @@ static void print_diagnostics(void)
     ESP_LOGI(TAG, "MUX_S0_PIN: GPIO %d", MUX_S0_PIN);
     ESP_LOGI(TAG, "MUX_S1_PIN: GPIO %d", MUX_S1_PIN);
     ESP_LOGI(TAG, "MUX_S2_PIN: GPIO %d", MUX_S2_PIN);
-    ESP_LOGI(TAG, "MUX_S3_PIN: GPIO %d", MUX_S3_PIN);
     ESP_LOGI(TAG, "SPI MOSI: GPIO %d", PCAP_SPI_MOSI_PIN);
     ESP_LOGI(TAG, "SPI MISO: GPIO %d", PCAP_SPI_MISO_PIN);
     ESP_LOGI(TAG, "SPI SCLK: GPIO %d", PCAP_SPI_SCLK_PIN);
@@ -229,21 +177,19 @@ static void print_results(void)
     printf("-----|----------|----------|----------|----------|----------|----------\n");
 
     // Print data for each chip
-    for (int chip = PCAP_CHIP_2; chip <= PCAP_CHIP_8; chip++) {
+    for (int chip = PCAP_CHIP_1; chip <= NUM_PCAP_CHIPS; chip++) {
         printf("  %d  | ", chip + 1);
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
-            // if (!nn_is_ready()) {
-            //     chip_data[chip].final_val[sensor] = (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor]);            
-            // }
-            // float value = chip_data[chip].final_val[sensor];
-            // printf("%.2f | ", value);
+            if (!nn_is_ready()) {
+                chip_data[chip].final_val[sensor] = (1000 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
+            }
+            value = chip_data[chip].final_val[sensor];
 
-            value = (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);
             if (value > 1.0) 
             {
-                printf("%f | ", value);
+                printf("%.2f | ", value);
             } else {
                 printf(" | 0.00000");
             }
@@ -304,11 +250,7 @@ static void sensor_task(void *pvParameters)
     const TickType_t measurement_period = pdMS_TO_TICKS(10);  // 100Hz
     const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
 
-#if BLE_TEST_MODE    
-    ESP_LOGI(TAG, "Sensor task started (BLE TEST MODE - dummy data)");
-#else
     ESP_LOGI(TAG, "Sensor task started");
-#endif
 
     while (1) {
         TickType_t current_time = xTaskGetTickCount();
@@ -317,12 +259,8 @@ static void sensor_task(void *pvParameters)
         if ((current_time - last_measurement) >= measurement_period) {
             last_measurement = current_time;
 
-#if BLE_TEST_MODE
-            // Generate dummy data for BLE transmission
-            generate_dummy_data();
-#else
             // Read results from each chip
-            for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
                 pcap_read_data((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
 
                 // Apply NN-based hysteresis compensation
@@ -330,7 +268,6 @@ static void sensor_task(void *pvParameters)
                     nn_compensate_chip(&chip_data[pcap_num]);
                 }
             }
-#endif
             // Print results to serial
             print_results();
         }
@@ -340,7 +277,7 @@ static void sensor_task(void *pvParameters)
             last_ble_update = current_time;
 
             // Send data from all active chips
-            for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
                 ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
             }
         }
@@ -368,7 +305,7 @@ void app_main(void)
 
     // Test communication with each chip
     ESP_LOGI(TAG, "--- Testing Communication ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
         // Block until we validate a successful communication
         test_result = false;
         while (!test_result) {
@@ -379,7 +316,7 @@ void app_main(void)
 
     // Initialize chips
     ESP_LOGI(TAG, "--- Initializing Chips ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
         pcap_init_chip((pcap_chip_select_t)pcap_num);
         pcap_write_firmware((pcap_chip_select_t)pcap_num, standard_firmware, PCAP_FW_SIZE);
         pcap_write_config((pcap_chip_select_t)pcap_num, standard_config, PCAP_CONFIG_SIZE);
@@ -392,7 +329,7 @@ void app_main(void)
 
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= PCAP_CHIP_8; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
     }
 #endif
@@ -404,11 +341,11 @@ void app_main(void)
     // Initialize Neural Network (optional - will gracefully fail if no model)
     ESP_LOGI(TAG, "--- Initializing Neural Network ---");
 
-    // if (nn_init()) {
-    //     ESP_LOGI(TAG, "Neural network initialized successfully");
-    // } else {
-    //     ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
-    // }
+    if (nn_init()) {
+        ESP_LOGI(TAG, "Neural network initialized successfully");
+    } else {
+        ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
+    }
 
     // Print diagnostics
     print_diagnostics();

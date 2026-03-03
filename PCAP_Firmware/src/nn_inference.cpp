@@ -20,7 +20,7 @@
 static const char* TAG = "NN";
 
 // Tensor arena size - adjust based on your model's requirements
-// Start with 32KB and increase if needed
+// Start with 78KB and increase if needed
 constexpr int kTensorArenaSize = 78 * 1024;
 
 // Aligned tensor arena for better performance
@@ -196,9 +196,9 @@ void nn_compensate_chip(pcap_data_t* data)
     float raw_floats[NUM_SENSORS_PER_CHIP];
     float compensated[NUM_SENSORS_PER_CHIP];
 
-    // Convert raw values to float (with offset subtraction)
+    // Convert raw values to scaled float input (matching print_results formula)
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        raw_floats[i] = data->raw[i] - data->offset[i];
+        raw_floats[i] = (1000.0f * (float)(data->raw[i] - data->offset[i])) / PCAP_CONVERSION_NUMBER;
     }
 
     nn_compensate(raw_floats, compensated, NUM_SENSORS_PER_CHIP);
