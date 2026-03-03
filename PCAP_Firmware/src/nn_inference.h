@@ -28,16 +28,12 @@ extern "C" {
 bool nn_init(void);
 
 /**
- * @brief Run inference to compensate for hysteresis
+ * @brief Run inference to compensate for hysteresis on a single sensor value
  *
- * Takes raw sensor readings and applies the neural network model
- * to produce hysteresis-compensated output values.
- *
- * @param raw_input Array of raw sensor readings (float)
- * @param compensated_output Array to store compensated values (float)
- * @param num_sensors Number of sensor values to process
+ * @param raw_input Scaled sensor reading
+ * @return Hysteresis-compensated value (passthrough if NN not ready)
  */
-void nn_compensate(const float* raw_input, float* compensated_output, int num_sensors);
+float nn_compensate(float raw_input);
 
 /**
  * @brief Run inference on a full chip's data

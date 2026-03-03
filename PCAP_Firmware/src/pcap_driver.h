@@ -34,9 +34,6 @@ extern "C" {
 #define PCAP_SPI_MISO_PIN   GPIO_NUM_9
 #define PCAP_SPI_SCLK_PIN   GPIO_NUM_8
 #define PCAP_SPI_CS_PIN     -1       ///< CS handled by multiplexer, not SPI driver
-
-// Taken from the datasheet
-#define PCAP_CONVERSION_NUMBER 134217728
 /** @} */
 
 /**

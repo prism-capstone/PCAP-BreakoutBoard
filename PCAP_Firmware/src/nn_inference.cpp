@@ -117,71 +117,39 @@ bool nn_init(void)
     return true;
 }
 
-void nn_compensate(const float* raw_input, float* compensated_output, int num_sensors)
+float nn_compensate(float raw_input)
 {
-    // Always pass through if NN not ready
-    if (!nn_ready) {
-        for (int i = 0; i < num_sensors; i++) {
-            compensated_output[i] = raw_input[i];
-        }
-        return;
-    }
-
-    // Only run actual inference if we have a real model
-    if (interpreter == nullptr || input_tensor == nullptr || output_tensor == nullptr) {
-        for (int i = 0; i < num_sensors; i++) {
-            compensated_output[i] = raw_input[i];
-        }
-        return;
+    if (!nn_ready || interpreter == nullptr || input_tensor == nullptr || output_tensor == nullptr) {
+        return raw_input;
     }
 
     int64_t start_time = esp_timer_get_time();
 
-    // Normalize input data using StandardScaler parameters
-    // Copy input data to input tensor
-    // Handle both float and quantized (int8) models
+    // Write normalized input to tensor
+    float normalized = normalize_input(raw_input);
     if (input_tensor->type == kTfLiteFloat32) {
-        float* input_data = input_tensor->data.f;
-        for (int i = 0; i < num_sensors && i < input_tensor->dims->data[1]; i++) {
-            input_data[i] = normalize_input(raw_input[i]);
-        }
+        input_tensor->data.f[0] = normalized;
     } else if (input_tensor->type == kTfLiteInt8) {
-        // For quantized models, normalize then apply quantization parameters
-        int8_t* input_data = input_tensor->data.int8;
         float scale = input_tensor->params.scale;
         int zero_point = input_tensor->params.zero_point;
-        for (int i = 0; i < num_sensors && i < input_tensor->dims->data[1]; i++) {
-            float normalized = normalize_input(raw_input[i]);
-            int32_t quantized = (int32_t)(normalized / scale) + zero_point;
-            input_data[i] = (int8_t)quantized;
-        }
+        input_tensor->data.int8[0] = (int8_t)((int32_t)(normalized / scale) + zero_point);
     }
 
     // Run inference
     TfLiteStatus invoke_status = interpreter->Invoke();
     if (invoke_status != kTfLiteOk) {
         ESP_LOGW(TAG, "Inference failed");
-        // Pass through raw values on error
-        for (int i = 0; i < num_sensors; i++) {
-            compensated_output[i] = raw_input[i];
-        }
-        return;
+        return raw_input;
     }
 
-    // Copy output data from output tensor
+    // Read output from tensor
+    float result = raw_input;
     if (output_tensor->type == kTfLiteFloat32) {
-        float* output_data = output_tensor->data.f;
-        for (int i = 0; i < num_sensors && i < output_tensor->dims->data[1]; i++) {
-            compensated_output[i] = output_data[i];
-        }
+        result = output_tensor->data.f[0];
     } else if (output_tensor->type == kTfLiteInt8) {
-        // For quantized models, apply dequantization
-        int8_t* output_data = output_tensor->data.int8;
         float scale = output_tensor->params.scale;
         int zero_point = output_tensor->params.zero_point;
-        for (int i = 0; i < num_sensors && i < output_tensor->dims->data[1]; i++) {
-            compensated_output[i] = (output_data[i] - zero_point) * scale;
-        }
+        result = (output_tensor->data.int8[0] - zero_point) * scale;
     }
 
     // Track timing
@@ -189,22 +157,20 @@ void nn_compensate(const float* raw_input, float* compensated_output, int num_se
     last_inference_time_us = (uint32_t)(end_time - start_time);
     total_inference_time_us += last_inference_time_us;
     inference_count++;
+
+    // Debug: log every 500th call to avoid flooding serial
+    if (inference_count % 500 == 0) {
+        ESP_LOGI(TAG, "NN: raw_in=%.4f  normalized=%.4f  raw_out=%.4f", raw_input, normalized, result);
+    }
+
+    return result;
 }
 
 void nn_compensate_chip(pcap_data_t* data)
 {
-    float raw_floats[NUM_SENSORS_PER_CHIP];
-    float compensated[NUM_SENSORS_PER_CHIP];
-
-    // Convert raw values to float (with offset subtraction)
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        raw_floats[i] = data->raw[i] - data->offset[i];
-    }
-
-    nn_compensate(raw_floats, compensated, NUM_SENSORS_PER_CHIP);
-
-    for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->final_val[i] = compensated[i];
+        float input = (PCAP_SCALING_NUM * (float)(data->raw[i] - data->offset[i])) / PCAP_CONVERSION_NUMBER;
+        data->final_val[i] = nn_compensate(input);
     }
 }
 

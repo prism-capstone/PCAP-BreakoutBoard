@@ -71,6 +71,10 @@ extern "C" {
 #define NUM_SENSORS_PER_CHIP 6      ///< Number of sensor inputs per PCAP04 chip
 #define PCAP_CONFIG_SIZE     52     ///< Size of configuration data in bytes
 #define PCAP_FW_SIZE         1024   ///< Size of firmware data in bytes
+
+// Taken from the datasheet
+#define PCAP_CONVERSION_NUMBER 134217728
+#define PCAP_SCALING_NUM 1000
 /** @} */
 
 /**
