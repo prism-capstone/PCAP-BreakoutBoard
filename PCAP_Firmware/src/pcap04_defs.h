@@ -67,7 +67,7 @@ extern "C" {
  * @brief Hardware configuration constants for the PCAP sensor system
  * @{
  */
-#define NUM_PCAP_CHIPS       5      ///< Total number of PCAP04 chips in the system
+#define NUM_PCAP_CHIPS       1      ///< Total number of PCAP04 chips in the system
 #define NUM_SENSORS_PER_CHIP 6      ///< Number of sensor inputs per PCAP04 chip
 #define PCAP_CONFIG_SIZE     52     ///< Size of configuration data in bytes
 #define PCAP_FW_SIZE         1024   ///< Size of firmware data in bytes

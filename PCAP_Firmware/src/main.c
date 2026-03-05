@@ -177,22 +177,16 @@ static void print_results(void)
     printf("-----|----------|----------|----------|----------|----------|----------\n");
 
     // Print data for each chip
-    for (int chip = PCAP_CHIP_1; chip <= NUM_PCAP_CHIPS; chip++) {
+    for (int chip = PCAP_CHIP_1; chip < NUM_PCAP_CHIPS; chip++) {
         printf("  %d  | ", chip + 1);
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
             if (!nn_is_ready()) {
-                chip_data[chip].final_val[sensor] = (1000 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
+                chip_data[chip].final_val[sensor] = (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
             }
             value = chip_data[chip].final_val[sensor];
-
-            if (value > 1.0) 
-            {
-                printf("%.2f | ", value);
-            } else {
-                printf(" | 0.00000");
-            }
+            printf("%.2f | ", value);
         }
         printf("\n");
     }
@@ -260,7 +254,7 @@ static void sensor_task(void *pvParameters)
             last_measurement = current_time;
 
             // Read results from each chip
-            for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
                 pcap_read_data((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
 
                 // Apply NN-based hysteresis compensation
@@ -277,7 +271,7 @@ static void sensor_task(void *pvParameters)
             last_ble_update = current_time;
 
             // Send data from all active chips
-            for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
                 ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
             }
         }
@@ -305,7 +299,7 @@ void app_main(void)
 
     // Test communication with each chip
     ESP_LOGI(TAG, "--- Testing Communication ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         // Block until we validate a successful communication
         test_result = false;
         while (!test_result) {
@@ -316,7 +310,7 @@ void app_main(void)
 
     // Initialize chips
     ESP_LOGI(TAG, "--- Initializing Chips ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         pcap_init_chip((pcap_chip_select_t)pcap_num);
         pcap_write_firmware((pcap_chip_select_t)pcap_num, standard_firmware, PCAP_FW_SIZE);
         pcap_write_config((pcap_chip_select_t)pcap_num, standard_config, PCAP_CONFIG_SIZE);
@@ -329,7 +323,7 @@ void app_main(void)
 
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num <= NUM_PCAP_CHIPS; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
     }
 #endif
@@ -341,13 +335,13 @@ void app_main(void)
     // Initialize Neural Network (optional - will gracefully fail if no model)
     ESP_LOGI(TAG, "--- Initializing Neural Network ---");
 
-    if (nn_init()) {
-        ESP_LOGI(TAG, "Neural network initialized successfully");
-    } else {
-        ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
-    }
+    // if (nn_init()) {
+    //     ESP_LOGI(TAG, "Neural network initialized successfully");
+    // } else {
+    //     ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
+    // }
 
-    // Print diagnostics
+    // Print diagnostics 
     print_diagnostics();
 
     ESP_LOGI(TAG, "Setup complete! Starting measurements...");
@@ -356,7 +350,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
+    // xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {
