@@ -183,8 +183,9 @@ static void print_results(void)
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
             if (!nn_is_ready()) {
-                chip_data[chip].final_val[sensor] = (100 * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
+                chip_data[chip].final_val[sensor] = (PCAP_SCALING_NUM * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
             }
+
             value = chip_data[chip].final_val[sensor];
             printf("%.2f | ", value);
         }
@@ -259,7 +260,7 @@ static void sensor_task(void *pvParameters)
 
                 // Apply NN-based hysteresis compensation
                 if (nn_is_ready()) {
-                    nn_compensate_chip(&chip_data[pcap_num]);
+                    nn_compensate_chip(&chip_data[pcap_num], pcap_num);
                 }
             }
             // Print results to serial

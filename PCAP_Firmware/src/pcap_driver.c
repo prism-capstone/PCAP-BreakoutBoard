@@ -245,7 +245,7 @@ void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint16_t num_sam
     }
 
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->offset[i] = (uint32_t)(accumulator[i] / num_samples);
+        data->offset[i] = (accumulator[i] / num_samples);
         ESP_LOGI(TAG, "Sensor %d offset: %lu (averaged over %d samples)", i, (unsigned long)data->offset[i], num_samples);
     }
 

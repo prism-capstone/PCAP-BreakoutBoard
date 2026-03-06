@@ -297,7 +297,7 @@ void ble_send_chip_data(uint8_t chip_num, pcap_data_t* data)
     int idx = 1;
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
         // Calculate calibrated value
-        float calibrated = (100 * (float)(data->raw[i] - data->offset[i])/PCAP_CONVERSION_NUMBER);
+        float calibrated = (PCAP_SCALING_NUM * (float)(data->raw[i] - data->offset[i])/PCAP_CONVERSION_NUMBER);
     
         // Pack float as 4 bytes (IEEE 754, little-endian)
         memcpy(&sensor_data_val[idx], &calibrated, sizeof(float));
