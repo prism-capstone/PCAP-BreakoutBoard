@@ -141,7 +141,7 @@ static void generate_dummy_data(void)
     static float counter = 0.0f;
     
     // Reset all data to zero first
-    for (int chip = PCAP_CHIP_2; chip <= NUM_PCAP_CHIPS; chip++) {
+    for (int chip = PCAP_CHIP_2; chip < NUM_PCAP_CHIPS; chip++) {
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             chip_data[chip].final_val[sensor] = 0.0f;
             chip_data[chip].raw[sensor] = 0;
@@ -315,7 +315,7 @@ static void sensor_task(void *pvParameters)
             generate_dummy_data();
 #else
             // Read results from each chip
-            for (int pcap_num = PCAP_CHIP_2; pcap_num <= NUM_PCAP_CHIPS-1; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_2; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
                 pcap_read_data((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
 
                 // Apply NN-based hysteresis compensation
@@ -333,7 +333,7 @@ static void sensor_task(void *pvParameters)
             last_ble_update = current_time;
 
             // Send data from all active chips
-            for (int pcap_num = PCAP_CHIP_2; pcap_num <= NUM_PCAP_CHIPS-1; pcap_num++) {
+            for (int pcap_num = PCAP_CHIP_2; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
                 ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
             }
         }
@@ -361,7 +361,7 @@ void app_main(void)
 
     // Test communication with each chip
     ESP_LOGI(TAG, "--- Testing Communication ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= NUM_PCAP_CHIPS-1; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_2; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         // Block until we validate a successful communication
         test_result = false;
         while (!test_result) {
@@ -372,7 +372,7 @@ void app_main(void)
 
     // Initialize chips
     ESP_LOGI(TAG, "--- Initializing Chips ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= NUM_PCAP_CHIPS-1; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_2; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         pcap_init_chip((pcap_chip_select_t)pcap_num);
         pcap_write_firmware((pcap_chip_select_t)pcap_num, standard_firmware, PCAP_FW_SIZE);
         pcap_write_config((pcap_chip_select_t)pcap_num, standard_config, PCAP_CONFIG_SIZE);
@@ -385,7 +385,7 @@ void app_main(void)
 
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
-    for (int pcap_num = PCAP_CHIP_2; pcap_num <= NUM_PCAP_CHIPS-1; pcap_num++) {
+    for (int pcap_num = PCAP_CHIP_2; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
     }
 #endif
