@@ -31,7 +31,7 @@ static const char* TAG = "MAIN";
 
 // Set to 1 to enable human-readable debug output via printf instead of
 // the machine-readable CSV serial format used by the normal data path.
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
@@ -358,7 +358,7 @@ void app_main(void)
 
     // Initialize battery ADC
     ESP_LOGI(TAG, "--- Initializing Battery ADC ---");
-    battery_adc_init();
+    // battery_adc_init();
 
     // Initialize BLE
     ESP_LOGI(TAG, "--- Initializing BLE ---");
@@ -382,7 +382,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    xTaskCreate(battery_task, "battery_task", 4096, NULL, 3, NULL);
+    // xTaskCreate(battery_task, "battery_task", 4096, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {
