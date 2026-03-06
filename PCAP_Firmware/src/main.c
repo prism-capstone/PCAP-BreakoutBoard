@@ -20,17 +20,14 @@
 #include "esp_task_wdt.h"
 
 #include "pcap_driver.h"
-#include "ble_manager.h"
 #include "battery_manager.h"
 #include "nn_inference.h"
+#include "ble_manager.h"
 
 // Add battery header if available
 // #include "battery.h"  // Uncomment when battery.h exists
 
 static const char* TAG = "MAIN";
-
-// Set to 1 to enable BLE test mode (skips PCAP, sends dummy data)
-#define BLE_TEST_MODE 0
 
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
@@ -120,7 +117,6 @@ static const uint8_t standard_firmware[PCAP_FW_SIZE] = {
 
 // Function declarations
 static void print_diagnostics(void);
-static void print_results(void);
 static void sensor_task(void *pvParameters);
 static void battery_task(void *pvParameters);
 
@@ -157,6 +153,36 @@ static void print_diagnostics(void)
     ESP_LOGI(TAG, "Sensors per chip: %d", NUM_SENSORS_PER_CHIP);
     ESP_LOGI(TAG, "NN inference ready: %s", nn_is_ready() ? "YES" : "NO");
     ESP_LOGI(TAG, "========================================");
+}
+
+/**
+ * @brief Send chip sensor data to serial in place of BLE (Serial mode).
+ *
+ * Format: "D,<chip>,<s0>,<s1>,<s2>,<s3>,<s4>,<s5>\n"
+ * Mirrors the same 20Hz cadence as the BLE send path.
+ */
+static void serial_send_chip_data(uint8_t chip_num, pcap_data_t* data)
+{
+    printf("D,%d", chip_num);
+    for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
+        if(!nn_is_ready()) {
+            data->final_val[i] = (PCAP_SCALING_NUM * (float)(data->raw[i] - data->offset[i])/PCAP_CONVERSION_NUMBER);
+        }
+
+        float val = data->final_val[i];
+        printf(",%.4f", val);
+    }
+    printf("\n");
+}
+
+/**
+ * @brief Send battery percentage to serial in place of BLE (Serial mode).
+ *
+ * Format: "B,<percentage>\n"
+ */
+static void serial_send_battery(uint8_t battery_pct)
+{
+    printf("B,%d\n", battery_pct);
 }
 
 static void print_results(void)
@@ -200,8 +226,8 @@ static void print_results(void)
 
 /**
  * @brief Battery monitoring task
- * 
- * Periodically reads battery level and sends it over BLE.
+ *
+ * Periodically reads battery level and sends it over BLE or Serial.
  * Runs independently from sensor task to avoid coupling.
  */
 static void battery_task(void *pvParameters)
@@ -223,13 +249,11 @@ static void battery_task(void *pvParameters)
             
             // Read battery percentage
             uint8_t battery_pct = battery_get_percentage();
-            
-            // Log battery level
-            ESP_LOGI(TAG, "Battery: %d", battery_pct);
-            
-            // Send over BLE if connected
+
             if (ble_is_connected()) {
                 ble_send_battery(battery_pct);
+            } else {
+                serial_send_battery(battery_pct);
             }
         }
         
@@ -241,9 +265,7 @@ static void battery_task(void *pvParameters)
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
-    TickType_t last_ble_update = 0;
-    const TickType_t measurement_period = pdMS_TO_TICKS(10);  // 100Hz
-    const TickType_t ble_update_period = pdMS_TO_TICKS(50);   // 20Hz
+    const TickType_t measurement_period = pdMS_TO_TICKS(10);   // 100Hz
 
     ESP_LOGI(TAG, "Sensor task started");
 
@@ -263,17 +285,15 @@ static void sensor_task(void *pvParameters)
                     nn_compensate_chip(&chip_data[pcap_num], pcap_num);
                 }
             }
-            // Print results to serial
-            print_results();
-        }
 
-        // Send BLE updates every 50ms (20Hz) if connected
-        if (ble_is_connected() && (current_time - last_ble_update) >= ble_update_period) {
-            last_ble_update = current_time;
-
-            // Send data from all active chips
-            for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
-                ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
+            if (ble_is_connected()) {
+                for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                    ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
+                }
+            } else {
+                for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                    serial_send_chip_data(pcap_num, &chip_data[pcap_num]);
+                }
             }
         }
 
@@ -286,12 +306,8 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "PCAP04 ESP32C3 Firmware Starting...");
-#if BLE_TEST_MODE
-    ESP_LOGI(TAG, "*** BLE TEST MODE ENABLED ***");
-#endif
     ESP_LOGI(TAG, "========================================");
 
-#if !BLE_TEST_MODE
     bool test_result = false;
 
     // Initialize PCAP driver (includes SPI and MUX init)
@@ -327,7 +343,10 @@ void app_main(void)
     for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
     }
-#endif
+
+    // Initialize battery ADC
+    ESP_LOGI(TAG, "--- Initializing Battery ADC ---");
+    battery_adc_init();
 
     // Initialize BLE
     ESP_LOGI(TAG, "--- Initializing BLE ---");
@@ -351,7 +370,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    // xTaskCreate(battery_task, "battery_task", 1024, NULL, 3, NULL);
+    xTaskCreate(battery_task, "battery_task", 4096, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {

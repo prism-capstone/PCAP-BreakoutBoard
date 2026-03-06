@@ -13,11 +13,7 @@ extern "C" {
 
 #include <stdint.h>
 
-// For the new board version use the uncommented one
-// #define BAT_ADC_CHANNEL ADC1_CHANNEL_0   // GPIO0 on ESP32-C3
-
-// For the old board version use anaolog channel 4.
-#define BAT_ADC_CHANNEL ADC_CHANNEL_4    // GPIO4 on ESP32-C3
+#define BAT_ADC_CHANNEL ADC1_CHANNEL_0   // GPIO0 on ESP32-C3
 
 #define BAT_ADC_UNIT        ADC_UNIT_1
 #define ADC_ATTEN           ADC_ATTEN_DB_12    // Changed from DB_11 to DB_12
