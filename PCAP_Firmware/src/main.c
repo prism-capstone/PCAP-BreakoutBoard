@@ -33,6 +33,10 @@ static const char* TAG = "MAIN";
 // the machine-readable CSV serial format used by the normal data path.
 #define DEBUG_MODE 0
 
+// Set to 1 to require a host handshake before streaming begins.
+// The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
+#define HANDSHAKE_MODE 0
+
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
 
@@ -123,6 +127,29 @@ static const uint8_t standard_firmware[PCAP_FW_SIZE] = {
 static void print_diagnostics(void);
 static void sensor_task(void *pvParameters);
 static void battery_task(void *pvParameters);
+
+#if HANDSHAKE_MODE
+/**
+ * @brief Block until the host sends a newline nudge, then reply "OK\n".
+ *
+ * The host repeatedly sends '\n' until it receives "OK".
+ * Once acknowledged, normal streaming begins.
+ */
+static void wait_for_handshake(void)
+{
+    ESP_LOGI(TAG, "Waiting for host handshake (send newline to begin)...");
+    int c;
+    while (1) {
+        c = getchar();
+        if (c == '\n' || c == '\r') {
+            printf("OK\n");
+            fflush(stdout);
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "Handshake complete. Starting stream.");
+}
+#endif
 
 static void print_diagnostics(void)
 {
@@ -377,6 +404,10 @@ void app_main(void)
     print_diagnostics();
 
     ESP_LOGI(TAG, "Setup complete! Starting measurements...");
+
+#if HANDSHAKE_MODE
+    wait_for_handshake();
+#endif
 
     // Create sensor task (high priority for time-critical measurements)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
