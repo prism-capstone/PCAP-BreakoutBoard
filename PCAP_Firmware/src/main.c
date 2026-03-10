@@ -44,7 +44,7 @@ static pcap_data_t chip_data[NUM_PCAP_CHIPS];
 static bool pcap_usable[NUM_PCAP_CHIPS];
 
 // Number of communication attempts before marking a chip as unusable
-#define PCAP_COMM_RETRY_MAX 5
+#define PCAP_COMM_RETRY_MAX 10
 
 // Battery monitoring configuration
 #define BATTERY_UPDATE_INTERVAL_MS 5000  // Update every 5 seconds
