@@ -75,7 +75,7 @@ extern "C" {
 
 // Taken from the datasheet
 #define PCAP_CONVERSION_NUMBER 134217728
-#define PCAP_SCALING_NUM 100
+#define PCAP_SCALING_NUM 1000
 /** @} */
 
 /**
