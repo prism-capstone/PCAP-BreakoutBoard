@@ -29,8 +29,22 @@
 
 static const char* TAG = "MAIN";
 
+// Set to 1 to enable human-readable debug output via printf instead of
+// the machine-readable CSV serial format used by the normal data path.
+#define DEBUG_MODE 0
+
+// Set to 1 to require a host handshake before streaming begins.
+// The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
+#define HANDSHAKE_MODE 0
+
 // Storage for sensor data from all chips
 static pcap_data_t chip_data[NUM_PCAP_CHIPS];
+
+// Tracks which chips responded successfully during startup communication test
+static bool pcap_usable[NUM_PCAP_CHIPS];
+
+// Number of communication attempts before marking a chip as unusable
+#define PCAP_COMM_RETRY_MAX 5
 
 // Battery monitoring configuration
 #define BATTERY_UPDATE_INTERVAL_MS 5000  // Update every 5 seconds
@@ -120,6 +134,29 @@ static void print_diagnostics(void);
 static void sensor_task(void *pvParameters);
 static void battery_task(void *pvParameters);
 
+#if HANDSHAKE_MODE
+/**
+ * @brief Block until the host sends a newline nudge, then reply "OK\n".
+ *
+ * The host repeatedly sends '\n' until it receives "OK".
+ * Once acknowledged, normal streaming begins.
+ */
+static void wait_for_handshake(void)
+{
+    ESP_LOGI(TAG, "Waiting for host handshake (send newline to begin)...");
+    int c;
+    while (1) {
+        c = getchar();
+        if (c == '\n' || c == '\r') {
+            printf("OK\n");
+            fflush(stdout);
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "Handshake complete. Starting stream.");
+}
+#endif
+
 static void print_diagnostics(void)
 {
     esp_chip_info_t chip_info;
@@ -202,8 +239,9 @@ static void print_results(void)
     printf("Chip | S0       | S1       | S2       | S3       | S4       | S5\n");
     printf("-----|----------|----------|----------|----------|----------|----------\n");
 
-    // Print data for each chip
-    for (int chip = PCAP_CHIP_1; chip < NUM_PCAP_CHIPS; chip++) {
+    // Print data for each usable chip
+    for (int chip = FIRST_PCAP_ID; chip < NUM_PCAP_CHIPS; chip++) {
+        if (!pcap_usable[chip]) continue;
         printf("  %d  | ", chip + 1);
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
@@ -253,7 +291,11 @@ static void battery_task(void *pvParameters)
             if (ble_is_connected()) {
                 ble_send_battery(battery_pct);
             } else {
+#if DEBUG_MODE
+                printf("Battery: %d%%\n", battery_pct);
+#else
                 serial_send_battery(battery_pct);
+#endif
             }
         }
         
@@ -276,8 +318,9 @@ static void sensor_task(void *pvParameters)
         if ((current_time - last_measurement) >= measurement_period) {
             last_measurement = current_time;
 
-            // Read results from each chip
-            for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+            // Read results from each usable chip
+            for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                if (!pcap_usable[pcap_num]) continue;
                 pcap_read_data((pcap_chip_select_t)pcap_num, &chip_data[pcap_num]);
 
                 // Apply NN-based hysteresis compensation
@@ -287,13 +330,19 @@ static void sensor_task(void *pvParameters)
             }
 
             if (ble_is_connected()) {
-                for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                    if (!pcap_usable[pcap_num]) continue;
                     ble_send_chip_data(pcap_num, &chip_data[pcap_num]);
                 }
             } else {
-                for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+#if DEBUG_MODE
+                print_results();
+#else
+                for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+                    if (!pcap_usable[pcap_num]) continue;
                     serial_send_chip_data(pcap_num, &chip_data[pcap_num]);
                 }
+#endif
             }
         }
 
@@ -308,26 +357,32 @@ void app_main(void)
     ESP_LOGI(TAG, "PCAP04 ESP32C3 Firmware Starting...");
     ESP_LOGI(TAG, "========================================");
 
-    bool test_result = false;
-
     // Initialize PCAP driver (includes SPI and MUX init)
     pcap_driver_init();
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // Test communication with each chip
+    // Test communication with each chip; mark only responding chips as usable
     ESP_LOGI(TAG, "--- Testing Communication ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
-        // Block until we validate a successful communication
-        test_result = false;
-        while (!test_result) {
-            test_result = pcap_test_communication((pcap_chip_select_t)pcap_num);
+    for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+        pcap_usable[pcap_num] = false;
+        for (int attempt = 0; attempt < PCAP_COMM_RETRY_MAX; attempt++) {
+            if (pcap_test_communication((pcap_chip_select_t)pcap_num)) {
+                pcap_usable[pcap_num] = true;
+                break;
+            }
             vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        if (pcap_usable[pcap_num]) {
+            ESP_LOGI(TAG, "PCAP %d: OK", pcap_num);
+        } else {
+            ESP_LOGW(TAG, "PCAP %d: NOT RESPONDING - skipping", pcap_num);
         }
     }
 
     // Initialize chips
     ESP_LOGI(TAG, "--- Initializing Chips ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+    for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+        if (!pcap_usable[pcap_num]) continue;
         pcap_init_chip((pcap_chip_select_t)pcap_num);
         pcap_write_firmware((pcap_chip_select_t)pcap_num, standard_firmware, PCAP_FW_SIZE);
         pcap_write_config((pcap_chip_select_t)pcap_num, standard_config, PCAP_CONFIG_SIZE);
@@ -340,7 +395,8 @@ void app_main(void)
 
     // Calibrate all chips
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
-    for (int pcap_num = PCAP_CHIP_1; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+    for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
+        if (!pcap_usable[pcap_num]) continue;
         pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
     }
 
@@ -365,6 +421,10 @@ void app_main(void)
     print_diagnostics();
 
     ESP_LOGI(TAG, "Setup complete! Starting measurements...");
+
+#if HANDSHAKE_MODE
+    wait_for_handshake();
+#endif
 
     // Create sensor task (high priority for time-critical measurements)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
