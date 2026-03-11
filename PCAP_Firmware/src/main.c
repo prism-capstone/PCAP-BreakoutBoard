@@ -207,7 +207,7 @@ static void serial_send_chip_data(uint8_t chip_num, pcap_data_t* data)
         }
 
         float val = data->final_val[i];
-        printf(",%.4f", val);
+        printf(",%f", val);
     }
     printf("\n");
 }
