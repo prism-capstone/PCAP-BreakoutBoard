@@ -149,7 +149,6 @@ static void wait_for_handshake(void)
         c = getchar();
         if (c == '\n' || c == '\r') {
             printf("OK\n");
-            fflush(stdout);
             break;
         }
     }
@@ -247,7 +246,7 @@ static void print_results(void)
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
             if (!nn_is_ready()) {
-                chip_data[chip].final_val[sensor] = (PCAP_SCALING_NUM * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);            
+                chip_data[chip].final_val[sensor] = (PCAP_SCALING_NUM * (float)(chip_data[chip].raw[sensor] - chip_data[chip].offset[sensor])/PCAP_CONVERSION_NUMBER);
             }
 
             value = chip_data[chip].final_val[sensor];
@@ -307,7 +306,7 @@ static void battery_task(void *pvParameters)
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
-    const TickType_t measurement_period = pdMS_TO_TICKS(10);   // 100Hz
+    const TickType_t measurement_period = pdMS_TO_TICKS(50);   // 20Hz
 
     ESP_LOGI(TAG, "Sensor task started");
 

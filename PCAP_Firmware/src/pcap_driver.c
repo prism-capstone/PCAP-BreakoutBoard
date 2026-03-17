@@ -9,6 +9,7 @@
 #include "string.h"
 
 static const char* TAG = "PCAP";
+static bool spi_initialized = false;
 
 static spi_device_handle_t spi_handle;
 static const uint8_t sensor_addr[NUM_SENSORS_PER_CHIP] = {0x00, 0x04, 0x08, 0x0C, 0x10, 0x14};
@@ -55,11 +56,17 @@ void pcap_driver_init(void)
         return;
     }
 
+    spi_initialized = true;
     ESP_LOGI(TAG, "PCAP driver initialized");
 }
 
 static uint8_t spi_transfer_byte(uint8_t data)
 {
+    if (!spi_initialized) {
+        ESP_LOGE(TAG, "spi_transfer_byte called before init!");
+        return 0;
+    }
+
     spi_transaction_t trans = {
         .length = 8,
         .tx_buffer = &data,
@@ -72,6 +79,11 @@ static uint8_t spi_transfer_byte(uint8_t data)
 
 static void spi_transfer_bytes(const uint8_t* tx_data, uint8_t* rx_data, size_t len)
 {
+    if (!spi_initialized) {
+        ESP_LOGE(TAG, "spi_transfer_byte called before init!");
+        return;
+    }
+
     spi_transaction_t trans = {
         .length = len * 8,
         .tx_buffer = tx_data,

@@ -45,8 +45,7 @@ typedef enum {
     PCAP_CHIP_5 = 4,        ///< PCAP chip 5 (mux channel 4)
     PCAP_CHIP_6 = 5,        ///< PCAP chip 6 (mux channel 5)
     PCAP_CHIP_7 = 6,        ///< PCAP chip 7 (mux channel 6)
-    PCAP_CHIP_8 = 7,        ///< PCAP chip 8 (mux channel 7)
-    PCAP_CHIP_NONE = 15     ///< No chip selected / invalid selection
+    PCAP_CHIP_NONE = 7      ///< No chip selected / invalid selection
 } pcap_chip_select_t;
 
 /**
