@@ -31,7 +31,7 @@ static const char* TAG = "MAIN";
 
 // Set to 1 to enable human-readable debug output via printf instead of
 // the machine-readable CSV serial format used by the normal data path.
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 // Set to 1 to require a host handshake before streaming begins.
 // The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
@@ -228,7 +228,7 @@ static void print_results(void)
 
     // Only print every 50 measurements (every 500ms at 100Hz)
     print_counter++;
-    if (print_counter < 50) {
+    if (print_counter < 15) {
         return;
     }
     print_counter = 0;
@@ -396,7 +396,7 @@ void app_main(void)
     ESP_LOGI(TAG, "--- Calibrating Sensors ---");
     for (int pcap_num = FIRST_PCAP_ID; pcap_num < NUM_PCAP_CHIPS; pcap_num++) {
         if (!pcap_usable[pcap_num]) continue;
-        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 10);
+        pcap_calibrate((pcap_chip_select_t)pcap_num, &chip_data[pcap_num], 100);
     }
 
     // Initialize battery ADC
@@ -429,7 +429,7 @@ void app_main(void)
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     
     // Create battery monitoring task (lower priority, less time-critical)
-    xTaskCreate(battery_task, "battery_task", 4096, NULL, 3, NULL);
+    // xTaskCreate(battery_task, "battery_task", 4096, NULL, 3, NULL);
 
     // Main task can now idle
     while (1) {

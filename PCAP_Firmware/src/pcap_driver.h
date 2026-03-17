@@ -26,7 +26,7 @@ extern "C" {
  * @brief SPI bus settings for PCAP04 communication
  * @{
  */
-#define PCAP_SPI_CLOCK_HZ   4000000  ///< SPI clock frequency: 4 MHz
+#define PCAP_SPI_CLOCK_HZ   1000000  ///< SPI clock frequency: 1 MHz
 #define PCAP_SPI_MODE       1        ///< SPI mode 1 (CPOL=0, CPHA=1)
 
 // XIAO ESP32C3 SPI pins
