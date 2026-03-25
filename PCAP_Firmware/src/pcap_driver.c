@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "string.h"
+#include "stdlib.h"
 
 static const char* TAG = "PCAP";
 static bool spi_initialized = false;
@@ -235,6 +236,13 @@ bool pcap_test_communication(pcap_chip_select_t chip)
     return test_passed;
 }
 
+static int compare_float(const void* a, const void* b)
+{
+    float fa = *(const float*)a;
+    float fb = *(const float*)b;
+    return (fa > fb) - (fa < fb);
+}
+
 void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint16_t num_samples)
 {
     if (data == NULL) {
@@ -242,23 +250,48 @@ void pcap_calibrate(pcap_chip_select_t chip, pcap_data_t* data, uint16_t num_sam
         return;
     }
 
-    if (num_samples == 0) {
-        ESP_LOGE(TAG, "pcap_calibrate called with 0 samples");
+    if (num_samples <= 10) {
+        ESP_LOGE(TAG, "pcap_calibrate requires more than 10 samples (got %d)", num_samples);
         return;
     }
 
-    uint64_t accumulator[NUM_SENSORS_PER_CHIP] = {0};
-
-    for (int s = 0; s < num_samples; s++) {
-        pcap_read_data(chip, data);
-        for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-            accumulator[i] += data->raw[i];
+    // Allocate per-sensor sample buffers
+    float* samples[NUM_SENSORS_PER_CHIP];
+    for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
+        samples[i] = malloc(num_samples * sizeof(float));
+        if (samples[i] == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate calibration buffer for sensor %d", i);
+            for (int j = 0; j < i; j++) free(samples[j]);
+            return;
         }
     }
 
+    // Collect samples
+    for (int s = 0; s < num_samples; s++) {
+        pcap_read_data(chip, data);
+        for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
+            samples[i][s] = data->raw[i];
+        }
+    }
+    
+    // Trimmed mean: discard the bottom and top 10%, average the rest.
+    uint16_t trim  = num_samples / 10;
+    uint16_t start = trim;
+    uint16_t end   = num_samples - trim;
+    uint16_t count = end - start;
+
     for (int i = 0; i < NUM_SENSORS_PER_CHIP; i++) {
-        data->offset[i] = (accumulator[i] / num_samples);
-        ESP_LOGI(TAG, "Sensor %d offset: %lu (averaged over %d samples)", i, (unsigned long)data->offset[i], num_samples);
+        qsort(samples[i], num_samples, sizeof(float), compare_float);
+
+        double acc = 0.0;
+        for (uint16_t s = start; s < end; s++) {
+            acc += samples[i][s];
+        }
+
+        data->offset[i] = (float)(acc / count);
+        ESP_LOGI(TAG, "Sensor %d offset: %.2f (trimmed mean, %d/%d samples used)",
+                 i, data->offset[i], count, num_samples);
+        free(samples[i]);
     }
 
     ESP_LOGI(TAG, "Calibration complete for chip %d", chip);

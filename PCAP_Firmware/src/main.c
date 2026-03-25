@@ -410,7 +410,7 @@ void app_main(void)
     // Initialize Neural Network (optional - will gracefully fail if no model)
     ESP_LOGI(TAG, "--- Initializing Neural Network ---");
 
-    // if (nn_init()) {
+    // if (nn_init()) { 
     //     ESP_LOGI(TAG, "Neural network initialized successfully");
     // } else {
     //     ESP_LOGW(TAG, "Neural network initialization failed - using raw values");
