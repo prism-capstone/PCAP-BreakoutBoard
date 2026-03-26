@@ -31,7 +31,7 @@ static const char* TAG = "MAIN";
 
 // Set to 1 to enable human-readable debug output via printf instead of
 // the machine-readable CSV serial format used by the normal data path.
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 
 // Set to 1 to require a host handshake before streaming begins.
 // The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
