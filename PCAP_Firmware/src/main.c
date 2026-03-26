@@ -31,7 +31,7 @@ static const char* TAG = "MAIN";
 
 // Set to 1 to enable human-readable debug output via printf instead of
 // the machine-readable CSV serial format used by the normal data path.
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 // Set to 1 to require a host handshake before streaming begins.
 // The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
@@ -242,7 +242,7 @@ static void print_results(void)
     // Print data for each usable chip
     for (int chip = FIRST_PCAP_ID; chip < NUM_PCAP_CHIPS; chip++) {
         if (!pcap_usable[chip]) continue;
-        printf("  %d  | ", chip + 1);
+        printf("  %d  | ", chip);
 
         for (int sensor = 0; sensor < NUM_SENSORS_PER_CHIP; sensor++) {
             // Use NN-compensated value if available, otherwise raw-offset
@@ -307,14 +307,14 @@ static void battery_task(void *pvParameters)
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
-    const TickType_t measurement_period = pdMS_TO_TICKS(10);   // 100Hz
+    const TickType_t measurement_period = pdMS_TO_TICKS(50);   // 20Hz
 
     ESP_LOGI(TAG, "Sensor task started");
 
     while (1) {
         TickType_t current_time = xTaskGetTickCount();
 
-        // Take measurement every 10ms (100Hz)
+        // Take measurement every 10ms (50Hz)
         if ((current_time - last_measurement) >= measurement_period) {
             last_measurement = current_time;
 
