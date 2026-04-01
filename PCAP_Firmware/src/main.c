@@ -18,6 +18,7 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_task_wdt.h"
+#include "driver/usb_serial_jtag.h"
 
 #include "pcap_driver.h"
 #include "battery_manager.h"
@@ -31,7 +32,7 @@ static const char* TAG = "MAIN";
 
 // Set to 1 to enable human-readable debug output via printf instead of
 // the machine-readable CSV serial format used by the normal data path.
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 
 // Set to 1 to require a host handshake before streaming begins.
 // The host sends '\n' as a nudge; the MCU replies "OK\n" then starts.
@@ -143,17 +144,18 @@ static void battery_task(void *pvParameters);
  */
 static void wait_for_handshake(void)
 {
-    ESP_LOGI(TAG, "Waiting for host handshake (send newline to begin)...");
-    int c;
+    usb_serial_jtag_driver_config_t cfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    usb_serial_jtag_driver_install(&cfg);
+
+    uint8_t c;
     while (1) {
-        c = getchar();
-        if (c == '\n' || c == '\r') {
+        int len = usb_serial_jtag_read_bytes(&c, 1, pdMS_TO_TICKS(100));
+        if (len > 0 && (c == '\n' || c == '\r')) {
             printf("OK\n");
             fflush(stdout);
             break;
         }
     }
-    ESP_LOGI(TAG, "Handshake complete. Starting stream.");
 }
 #endif
 
@@ -307,7 +309,7 @@ static void battery_task(void *pvParameters)
 static void sensor_task(void *pvParameters)
 {
     TickType_t last_measurement = 0;
-    const TickType_t measurement_period = pdMS_TO_TICKS(50);   // 20Hz
+    const TickType_t measurement_period = pdMS_TO_TICKS(10);   // 20Hz
 
     ESP_LOGI(TAG, "Sensor task started");
 
